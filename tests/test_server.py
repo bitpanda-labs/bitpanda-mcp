@@ -38,7 +38,7 @@ async def test_lifespan_with_api_key() -> None:
 
 
 async def test_lifespan_without_api_key() -> None:
-    settings = Settings(_env_file=None)
+    settings = Settings(bitpanda_api_key=None, _env_file=None)
     with patch("bitpanda_mcp.server.Settings", return_value=settings):
         mock_server = AsyncMock()
         async with lifespan(mock_server) as ctx:

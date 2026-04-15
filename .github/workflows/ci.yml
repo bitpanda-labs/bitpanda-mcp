@@ -63,7 +63,7 @@ jobs:
 
       - name: Verify wheel install
         run: |
-          uv venv /tmp/pkg-test --python 3.14
+          uv venv /tmp/pkg-test --python 3.14 --seed
           /tmp/pkg-test/bin/pip install dist/*.whl
           /tmp/pkg-test/bin/python -c "from bitpanda_mcp import __version__; assert __version__"
 

@@ -73,7 +73,7 @@ Rules:
 
 ## Code style
 
-- ruff handles all linting and formatting (target: Python 3.11)
+- ruff handles all linting and formatting (infers target from `requires-python`)
 - Line length: 110
 - Use `ToolError` for tool errors, never return error dicts
 - Use `ToolAnnotations(readOnlyHint=True, openWorldHint=True)` for all Bitpanda tools
