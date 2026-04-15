@@ -1,5 +1,6 @@
 from fastmcp import Context
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.assets import AssetData
@@ -12,6 +13,8 @@ async def get_asset(asset_id: str, ctx: Context) -> AssetData:
         return await get_bp_client(ctx).get_asset(asset_id)
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
+    except ValidationError as e:
+        raise ToolError(f"Unexpected API response: {e}") from e
 
 
 async def list_assets(
@@ -29,3 +32,5 @@ async def list_assets(
         return {"count": len(items), "assets": items}
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
+    except ValidationError as e:
+        raise ToolError(f"Unexpected API response: {e}") from e

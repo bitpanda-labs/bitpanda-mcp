@@ -10,3 +10,10 @@ __pycache__
 htmlcov
 xunit-reports
 .claude
+dist/
+build/
+*.egg-info/
+tests/
+.github/
+CLAUDE.md
+.pre-commit-config.yaml

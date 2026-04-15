@@ -8,6 +8,7 @@ from mcp.types import ToolAnnotations
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from bitpanda_mcp import __version__
 from bitpanda_mcp.auth import BearerKeyVerifier
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.config import Settings
@@ -48,7 +49,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
 
 mcp = FastMCP(
     name="bitpanda-mcp",
-    version="0.1.0",
+    version=__version__,
     instructions=(
         "MCP server for Bitpanda. Use get_portfolio for a full overview of holdings with EUR values. "
         "Use get_price to check a specific asset price by symbol (e.g. BTC, ETH). "

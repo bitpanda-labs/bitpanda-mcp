@@ -1,5 +1,6 @@
 from fastmcp import Context
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.common import BitpandaAPIError
@@ -21,3 +22,5 @@ async def list_trades(
         return {"count": len(trades), "trades": [t.model_dump(mode="json") for t in trades]}
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
+    except ValidationError as e:
+        raise ToolError(f"Unexpected API response: {e}") from e

@@ -2,6 +2,8 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
+from bitpanda_mcp.clients.bitpanda import BitpandaClient
+
 TRADES_RESPONSE = {
     "data": [
         {
@@ -57,6 +59,20 @@ async def test_list_trades_filter_type(mcp_client, mock_router: respx.MockRouter
     result = await mcp_client.call_tool("list_trades", {"trade_type": "buy"})
     assert result.data["count"] == 1
     assert result.data["trades"][0]["type"] == "buy"
+
+
+async def test_list_trades_with_type_filter_client(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    mock_router.get("/v1/trades").respond(json={"data": [], "has_next_page": False})
+    trades = await bp_client.list_trades(trade_type="buy")
+    assert trades == []
+
+
+async def test_list_trades_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/trades").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
+    with pytest.raises(ToolError, match="Unexpected API response"):
+        await mcp_client.call_tool("list_trades", {})
 
 
 async def test_list_trades_error(mcp_client, mock_router: respx.MockRouter) -> None:

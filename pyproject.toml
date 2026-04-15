@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "MCP server for Bitpanda — portfolio, wallets, trading, market data"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.13"
+authors = [
+    { name = "Bitpanda", email = "tech@bitpanda.com" },
+]
+requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=3.2",
     "httpx>=0.28",
@@ -14,6 +17,11 @@ dependencies = [
 
 [project.scripts]
 bitpanda-mcp = "bitpanda_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/bitpanda-labs/bitpanda-mcp"
+Repository = "https://github.com/bitpanda-labs/bitpanda-mcp"
+Issues = "https://github.com/bitpanda-labs/bitpanda-mcp/issues"
 
 [dependency-groups]
 dev = [
@@ -25,12 +33,12 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 110
-target-version = "py313"
+target-version = "py311"
 extend-exclude = [".venv"]
 
 [tool.ruff.lint]
@@ -61,7 +69,6 @@ extend-select = [
 ignore = [
     "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",
     "D203", "D213",
-    "ASYNC109",
 ]
 
 [tool.ruff.lint.pylint]
@@ -82,4 +89,5 @@ source = ["src/bitpanda_mcp"]
 
 [tool.coverage.report]
 skip_covered = true
-exclude_also = ["if TYPE_CHECKING:"]
+fail_under = 100
+exclude_also = ["if TYPE_CHECKING:", "if __name__", "def main", "except PackageNotFoundError"]

@@ -49,6 +49,12 @@ async def test_get_price_not_found(mcp_client, mock_router: respx.MockRouter) ->
         await mcp_client.call_tool("get_price", {"symbol": "DOGE"})
 
 
+async def test_get_price_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/ticker").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
+    with pytest.raises(ToolError, match="Unexpected API response"):
+        await mcp_client.call_tool("get_price", {"symbol": "BTC"})
+
+
 async def test_get_price_api_error(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/ticker").respond(status_code=500, json={"message": "Server error"})
 

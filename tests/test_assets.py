@@ -1,10 +1,44 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.models.common import BitpandaAPIError
+from bitpanda_mcp.tools.assets import list_assets
+
+# --- Error handling tests ---
+
+
+async def test_network_error_raises_api_error(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    mock_router.get("/v1/assets/abc-123").mock(side_effect=httpx.ConnectError("Connection refused"))
+
+    with pytest.raises(BitpandaAPIError, match="Network error"):
+        await bp_client.get_asset("abc-123")
+
+
+async def test_invalid_json_raises_api_error(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    mock_router.get("/v1/assets/abc-123").respond(
+        status_code=200, content=b"<html>Maintenance</html>", headers={"content-type": "text/html"}
+    )
+
+    with pytest.raises(BitpandaAPIError, match="Invalid JSON"):
+        await bp_client.get_asset("abc-123")
+
+
+async def test_validation_error_raises_tool_error(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/assets/abc-123").respond(json={"data": {"missing_required_fields": True}})
+
+    with pytest.raises(ToolError, match="Unexpected API response"):
+        await mcp_client.call_tool("get_asset", {"asset_id": "abc-123"})
+
 
 SAMPLE_ASSET = {
     "data": {
@@ -74,6 +108,14 @@ async def test_list_assets_pagination(bp_client: BitpandaClient, mock_router: re
     assert items[2]["symbol"] == "SOL"
 
 
+async def test_list_assets_with_type_filter(bp_client: BitpandaClient, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/assets").respond(
+        json={"data": [{"id": "1", "name": "Bitcoin", "symbol": "BTC"}], "has_next_page": False}
+    )
+    items = await bp_client.list_assets(asset_type="cryptocoin")
+    assert len(items) == 1
+
+
 async def test_list_assets_with_limit(bp_client: BitpandaClient, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/assets").mock(side_effect=_paginated_asset_handler)
 
@@ -97,6 +139,32 @@ async def test_mcp_get_asset_error(mcp_client, mock_router: respx.MockRouter) ->
 
     with pytest.raises(ToolError, match="Unauthorized"):
         await mcp_client.call_tool("get_asset", {"asset_id": "bad"})
+
+
+async def test_list_assets_validation_error_direct() -> None:
+    """Call tool directly (not via MCP) to cover except ValidationError."""
+    ctx = MagicMock()
+    bp = MagicMock()
+    bp.list_assets = AsyncMock(
+        side_effect=ValidationError.from_exception_data(
+            "CursorPage", [{"type": "missing", "loc": ("data",), "msg": "missing", "input": {}}]
+        )
+    )
+    ctx.lifespan_context = {"bp": bp}
+    with pytest.raises(ToolError, match="Unexpected API response"):
+        await list_assets(ctx)
+
+
+async def test_mcp_list_assets_error(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/assets").respond(status_code=500, json={"message": "Server error"})
+    with pytest.raises(ToolError, match="Server error"):
+        await mcp_client.call_tool("list_assets", {})
+
+
+async def test_mcp_list_assets_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/assets").respond(json={"not_data": True})
+    with pytest.raises(ToolError, match="Unexpected API response"):
+        await mcp_client.call_tool("list_assets", {})
 
 
 async def test_mcp_list_assets(mcp_client, mock_router: respx.MockRouter) -> None:

@@ -1,5 +1,6 @@
 from fastmcp import Context
 from fastmcp.exceptions import ResourceError
+from pydantic import ValidationError
 
 from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.common import BitpandaAPIError
@@ -16,3 +17,5 @@ async def get_asset_catalog(ctx: Context) -> str:
         return "\n".join(lines)
     except BitpandaAPIError as e:
         raise ResourceError(e.detail) from e
+    except ValidationError as e:
+        raise ResourceError(f"Unexpected API response: {e}") from e

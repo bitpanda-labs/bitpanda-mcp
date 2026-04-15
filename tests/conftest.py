@@ -31,10 +31,13 @@ def mock_router(bp_base_url: str) -> respx.MockRouter:
 
 
 @pytest.fixture
-def bp_client(mock_router: respx.MockRouter, bp_base_url: str) -> BitpandaClient:
+async def bp_client(mock_router: respx.MockRouter, bp_base_url: str) -> BitpandaClient:
     """BitpandaClient wired to the mocked HTTP transport."""
     http = httpx.AsyncClient(base_url=bp_base_url)
-    return BitpandaClient(http, api_key="test-key")
+    try:
+        yield BitpandaClient(http, api_key="test-key")
+    finally:
+        await http.aclose()
 
 
 def _register_all(server: FastMCP) -> None:

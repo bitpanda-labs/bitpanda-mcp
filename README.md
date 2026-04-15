@@ -2,7 +2,7 @@
 
 MCP server for the Bitpanda platform — portfolio, wallets, trading, market data.
 
-Built with [FastMCP 3.x](https://gofastmcp.com), Python 3.13+, and [uv](https://docs.astral.sh/uv/).
+Built with [FastMCP 3.x](https://gofastmcp.com), Python 3.11+, and [uv](https://docs.astral.sh/uv/).
 
 ## Quick Install
 
@@ -38,10 +38,17 @@ uvx --from git+https://github.com/bitpanda-labs/bitpanda-mcp bitpanda-mcp
 
 Set `BITPANDA_API_KEY` in your environment or `.env` file.
 
-### From PyPI (once published)
+### From PyPI
 
 ```bash
 uvx bitpanda-mcp
+```
+
+### From wheel
+
+```bash
+pip install dist/bitpanda_mcp-*.whl
+bitpanda-mcp
 ```
 
 ## Tools (10)
@@ -84,7 +91,7 @@ The server can also run as a remote HTTP service (e.g. at `mcp.bitpanda.com`). U
 FASTMCP_TRANSPORT=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=8000 uv run bitpanda-mcp
 ```
 
-Or with Docker:
+Or with Docker (multi-stage build — runtime image has no build tools):
 
 ```bash
 docker build -f ci/docker/Dockerfile -t bitpanda-mcp .
@@ -124,12 +131,17 @@ Get your API key at [web.bitpanda.com/apikey](https://web.bitpanda.com/apikey).
 
 ## Development
 
+Requires Python 3.11+.
+
 ```bash
 git clone <repo-url> && cd bitpanda-mcp
 uv sync
 cp .env.example .env  # edit with your API key
 
-uv run pytest                  # tests
+uv run pytest                  # tests (100% coverage)
 uv run ruff check src/ tests/  # lint
 uv run ruff format src/ tests/ # format
+uv build                       # build wheel + sdist
 ```
+
+CI runs lint, tests on Python 3.11–3.14, and verifies the wheel installs cleanly. Releases publish to PyPI automatically.

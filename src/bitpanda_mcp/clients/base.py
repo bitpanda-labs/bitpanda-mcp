@@ -18,13 +18,20 @@ class BaseClient:
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Perform an authenticated GET request and return parsed JSON.
 
-        Raises ``BitpandaAPIError`` on non-2xx/3xx responses.
+        Raises ``BitpandaAPIError`` on non-2xx/3xx responses, network errors,
+        and non-JSON responses (e.g. HTML proxy pages).
         """
-        resp = await self._http.get(path, headers=self._auth_headers, params=params)
+        try:
+            resp = await self._http.get(path, headers=self._auth_headers, params=params)
+        except httpx.HTTPError as exc:
+            raise BitpandaAPIError(0, f"Network error: {exc}") from exc
         if resp.status_code >= _ERROR_THRESHOLD:
             detail = _extract_error_detail(resp)
             raise BitpandaAPIError(resp.status_code, detail)
-        return resp.json()
+        try:
+            return resp.json()
+        except ValueError as exc:
+            raise BitpandaAPIError(0, "Invalid JSON in API response") from exc
 
     async def _paginate_all(
         self,

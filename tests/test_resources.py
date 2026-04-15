@@ -22,6 +22,12 @@ async def test_asset_catalog(mcp_client, mock_router: respx.MockRouter) -> None:
     assert "a2 | Ethereum | ETH" in text
 
 
+async def test_asset_catalog_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/assets").respond(json={"not_data": True})
+    with pytest.raises(McpError):
+        await mcp_client.read_resource("bitpanda://assets/catalog")
+
+
 async def test_asset_catalog_error(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/assets").respond(status_code=401, json={"message": "Unauthorized"})
 

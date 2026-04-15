@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
 if [ "$1" = 'mcp' ]; then
-    exec uv run bitpanda-mcp
+    exec bitpanda-mcp
 fi
 
 exec "$@"
