@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -12,6 +13,7 @@ from bitpanda_mcp import __version__
 from bitpanda_mcp.auth import BearerKeyVerifier
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.config import Settings
+from bitpanda_mcp.logging import configure_logging
 from bitpanda_mcp.prompts import portfolio as portfolio_prompts
 from bitpanda_mcp.resources import assets as asset_resources
 from bitpanda_mcp.tools import assets as asset_tools
@@ -33,6 +35,9 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
       per-request clients are built from the caller's Bearer token in ``get_bp_client()``.
     """
     settings = Settings()
+    configure_logging(json_output=settings.server_transport != "stdio")
+    log = logging.getLogger(__name__)
+    log.info("server_start", extra={"transport": settings.server_transport, "version": __version__})
 
     async with httpx.AsyncClient(
         base_url=settings.bitpanda_base_url,
@@ -45,6 +50,8 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
             ctx["bp"] = BitpandaClient(bp_http, settings.bitpanda_api_key)
 
         yield ctx
+
+    log.info("server_stop")
 
 
 mcp = FastMCP(
@@ -93,7 +100,7 @@ mcp.prompt()(portfolio_prompts.recent_activity)
 
 
 # --- Health check (HTTP mode only) ---
-@mcp.custom_route("/health", methods=["GET"])
+@mcp.custom_route("/healthz", methods=["GET"])
 async def health(_request: Request) -> JSONResponse:
     """Health check endpoint for load balancers."""
     return JSONResponse({"status": "ok"})

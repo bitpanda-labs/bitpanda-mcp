@@ -20,13 +20,15 @@ uv build                       # build wheel + sdist into dist/
 - `src/bitpanda_mcp/server.py` — FastMCP server, lifespan, tool registration
 - `src/bitpanda_mcp/config.py` — pydantic-settings, env vars
 - `src/bitpanda_mcp/auth.py` — Bearer token auth for HTTP mode
+- `src/bitpanda_mcp/logging.py` — stdlib logging configuration, JSON formatter, PII filter
 - `src/bitpanda_mcp/clients/` — async httpx clients, `get_bp_client()` for dual stdio/HTTP mode
 - `src/bitpanda_mcp/tools/` — MCP tool functions (all read-only)
 - `src/bitpanda_mcp/models/` — Pydantic models for API responses
 - `src/bitpanda_mcp/resources/` — MCP resources
 - `src/bitpanda_mcp/prompts/` — MCP prompt templates
 - `ci/docker/` — multi-stage Dockerfile, entrypoint script
-- `.github/workflows/` — CI (lint, test on 3.11–3.14, build) and publish (PyPI on release)
+- `.github/workflows/` — CI (lint, test on 3.11–3.14, security audit, build) and publish (PyPI on release)
+- `.github/dependabot.yml` — automated dependency updates (uv + GitHub Actions)
 - `tests/` — pytest + respx mocks, 100% coverage
 
 ## Packaging
@@ -70,6 +72,8 @@ Rules:
 - All tool functions catch both `BitpandaAPIError` and `pydantic.ValidationError`
 - Tools convert errors to `ToolError`; resources convert to `ResourceError`
 - Never expose raw tracebacks to MCP clients
+- Structured logging via stdlib `logging` with PII filtering (API keys, Bearer tokens redacted)
+- JSON log output in HTTP mode (CloudWatch-compatible), console output in stdio mode
 
 ## Code style
 

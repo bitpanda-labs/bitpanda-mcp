@@ -41,6 +41,9 @@ class BitpandaClient(BaseClient):
         self,
         *,
         asset_id: str | None = None,
+        index_asset_id: str | None = None,
+        last_credited_at_from: str | None = None,
+        last_credited_at_to: str | None = None,
         page_size: int = 25,
         limit: int = 0,
     ) -> list[Wallet]:
@@ -48,6 +51,12 @@ class BitpandaClient(BaseClient):
         params: dict[str, Any] = {}
         if asset_id:
             params["asset_id"] = asset_id
+        if index_asset_id:
+            params["index_asset_id"] = index_asset_id
+        if last_credited_at_from:
+            params["last_credited_at_from_including"] = last_credited_at_from
+        if last_credited_at_to:
+            params["last_credited_at_to_excluding"] = last_credited_at_to
         raw_items = await self._paginate_all("/v1/wallets/", params=params, page_size=page_size, limit=limit)
         return [Wallet.model_validate(item) for item in raw_items]
 

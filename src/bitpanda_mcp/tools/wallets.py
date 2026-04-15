@@ -9,12 +9,25 @@ from bitpanda_mcp.models.common import BitpandaAPIError
 async def list_wallets(
     ctx: Context,
     asset_id: str | None = None,
+    index_asset_id: str | None = None,
+    last_credited_at_from: str | None = None,
+    last_credited_at_to: str | None = None,
     non_zero: bool = False,
     page_size: int = 25,
 ) -> dict:
-    """List your Bitpanda crypto wallet balances. Set non_zero=true to hide empty wallets."""
+    """List your Bitpanda crypto wallet balances.
+
+    Supports filtering by asset_id, index_asset_id, and last_credited_at date range.
+    Set non_zero=true to hide empty wallets.
+    """
     try:
-        wallets = await get_bp_client(ctx).list_wallets(asset_id=asset_id, page_size=page_size)
+        wallets = await get_bp_client(ctx).list_wallets(
+            asset_id=asset_id,
+            index_asset_id=index_asset_id,
+            last_credited_at_from=last_credited_at_from,
+            last_credited_at_to=last_credited_at_to,
+            page_size=page_size,
+        )
         items = [w.model_dump(mode="json") for w in wallets]
         if non_zero:
             items = [w for w in items if w["balance"] > 0]

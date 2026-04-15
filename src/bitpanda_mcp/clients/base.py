@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import httpx
@@ -6,6 +7,8 @@ from bitpanda_mcp.models.common import BitpandaAPIError, CursorPage
 
 _ERROR_THRESHOLD = 400
 _MAX_PAGES = 500
+
+_log = logging.getLogger(__name__)
 
 
 class BaseClient:
@@ -24,9 +27,11 @@ class BaseClient:
         try:
             resp = await self._http.get(path, headers=self._auth_headers, params=params)
         except httpx.HTTPError as exc:
+            _log.error("api_network_error", extra={"path": path, "error": str(exc)})
             raise BitpandaAPIError(0, f"Network error: {exc}") from exc
         if resp.status_code >= _ERROR_THRESHOLD:
             detail = _extract_error_detail(resp)
+            _log.warning("api_error", extra={"path": path, "status": resp.status_code, "detail": detail})
             raise BitpandaAPIError(resp.status_code, detail)
         try:
             return resp.json()

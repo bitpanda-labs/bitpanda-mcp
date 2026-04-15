@@ -1,0 +1,27 @@
+name: Sync uv.lock
+
+on:
+  pull_request_target:
+    paths: ["pyproject.toml"]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.6"
+
+      - run: uv lock
+
+      - run: |
+          git add uv.lock
+          git commit -m "chore: sync uv.lock" && git push || true

@@ -22,7 +22,7 @@ def test_server_version_matches_package() -> None:
 def test_health_endpoint() -> None:
     app = mcp.http_app()
     client = TestClient(app)
-    resp = client.get("/health")
+    resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 

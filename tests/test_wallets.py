@@ -83,6 +83,42 @@ async def test_list_wallets_with_asset_id_filter(
     assert len(wallets) == 1
 
 
+async def test_list_wallets_with_index_asset_id_filter(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    route = mock_router.get("/v1/wallets/").respond(
+        json={
+            "data": [
+                {
+                    "wallet_id": "w1",
+                    "asset_id": "a1",
+                    "wallet_type": "CRYPTO_INDEX",
+                    "index_asset_id": "idx-1",
+                    "last_credited_at": "2025-01-01T00:00:00Z",
+                    "balance": 5.0,
+                }
+            ],
+            "has_next_page": False,
+        }
+    )
+    wallets = await bp_client.list_wallets(index_asset_id="idx-1")
+    assert len(wallets) == 1
+    assert "index_asset_id=idx-1" in str(route.calls[0].request.url)
+
+
+async def test_list_wallets_with_date_filters(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    route = mock_router.get("/v1/wallets/").respond(json={"data": [], "has_next_page": False})
+    await bp_client.list_wallets(
+        last_credited_at_from="2025-01-01T00:00:00Z",
+        last_credited_at_to="2025-06-01T00:00:00Z",
+    )
+    request_url = str(route.calls[0].request.url)
+    assert "last_credited_at_from_including=2025-01-01" in request_url
+    assert "last_credited_at_to_excluding=2025-06-01" in request_url
+
+
 async def test_list_wallets_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/wallets/").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
     with pytest.raises(ToolError, match="Unexpected API response"):

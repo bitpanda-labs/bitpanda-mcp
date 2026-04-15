@@ -113,7 +113,7 @@ docker run -p 8000:8000 bitpanda-mcp
 }
 ```
 
-Health check: `GET /health` returns `{"status": "ok"}`.
+Health check: `GET /healthz` returns `{"status": "ok"}`.
 
 ## Configuration
 
