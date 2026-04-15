@@ -12,7 +12,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY src/ src/
 COPY README.md LICENSE ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-editable
 
 # --- runtime ---
 FROM python:3.14-slim
