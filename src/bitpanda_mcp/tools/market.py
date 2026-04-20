@@ -6,7 +6,7 @@ from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.common import BitpandaAPIError
 
 
-async def get_price(symbol: str, ctx: Context) -> dict:
+async def get_price(ctx: Context, symbol: str) -> dict:
     """Get the current EUR price for an asset by its symbol (e.g. BTC, ETH)."""
     try:
         ticker = await get_bp_client(ctx).fetch_ticker()

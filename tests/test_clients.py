@@ -27,13 +27,12 @@ def test_get_bp_client_stdio_mode() -> None:
 
 
 @patch("bitpanda_mcp.clients.get_access_token")
-def test_get_bp_client_http_mode(mock_get_token: MagicMock) -> None:
+async def test_get_bp_client_http_mode(mock_get_token: MagicMock) -> None:
     mock_get_token.return_value = AccessToken(token=SAMPLE_KEY, client_id="bearer", scopes=[])
-    http = httpx.AsyncClient(base_url="https://test.bitpanda.com")
-    ctx = _make_ctx({"http": http})
-
-    result = get_bp_client(ctx)
-    assert isinstance(result, BitpandaClient)
+    async with httpx.AsyncClient(base_url="https://test.bitpanda.com") as http:
+        ctx = _make_ctx({"http": http})
+        result = get_bp_client(ctx)
+        assert isinstance(result, BitpandaClient)
 
 
 @patch("bitpanda_mcp.clients.get_access_token")
