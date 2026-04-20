@@ -38,13 +38,6 @@ uvx --from git+https://github.com/bitpanda-labs/bitpanda-mcp bitpanda-mcp
 
 Set `BITPANDA_API_KEY` in your environment or `.env` file.
 
-### From wheel
-
-```bash
-pip install dist/bitpanda_mcp-*.whl
-bitpanda-mcp
-```
-
 ## Tools (7)
 
 | Tool | Tags | Description |
@@ -127,6 +120,7 @@ uv run pytest                  # tests (100% coverage)
 uv run ruff check src/ tests/  # lint
 uv run ruff format src/ tests/ # format
 uv build                       # build wheel + sdist
+pip install dist/bitpanda_mcp-*.whl  # install and test the built wheel
 ```
 
 CI runs lint, tests on Python 3.11–3.14, and verifies the wheel installs cleanly.
