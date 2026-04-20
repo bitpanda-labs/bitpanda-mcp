@@ -38,12 +38,6 @@ uvx --from git+https://github.com/bitpanda-labs/bitpanda-mcp bitpanda-mcp
 
 Set `BITPANDA_API_KEY` in your environment or `.env` file.
 
-### From PyPI
-
-```bash
-uvx bitpanda-mcp
-```
-
 ### From wheel
 
 ```bash
@@ -125,7 +119,7 @@ Get your API key at [web.bitpanda.com/apikey](https://web.bitpanda.com/apikey).
 Requires Python 3.11+.
 
 ```bash
-git clone <repo-url> && cd bitpanda-mcp
+git clone https://github.com/bitpanda-labs/bitpanda-mcp && cd bitpanda-mcp
 uv sync
 cp .env.example .env  # edit with your API key
 
@@ -135,4 +129,4 @@ uv run ruff format src/ tests/ # format
 uv build                       # build wheel + sdist
 ```
 
-CI runs lint, tests on Python 3.11–3.14, and verifies the wheel installs cleanly. Releases publish to PyPI automatically.
+CI runs lint, tests on Python 3.11–3.14, and verifies the wheel installs cleanly.
