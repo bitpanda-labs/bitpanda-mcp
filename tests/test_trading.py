@@ -4,37 +4,32 @@ from fastmcp.exceptions import ToolError
 
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 
-TRADES_RESPONSE = {
-    "data": [
-        {
-            "id": "trade-1",
-            "type": "buy",
+
+def _trade(tid: str, trade_type: str, symbol: str, amount_fiat: str, amount_crypto: str) -> dict:
+    return {
+        "type": "trade",
+        "id": tid,
+        "attributes": {
+            "type": trade_type,
             "status": "finished",
-            "cryptocoin_id": "a-btc",
-            "cryptocoin_symbol": "BTC",
-            "fiat_id": "f-eur",
-            "amount_fiat": "1000.00",
-            "amount_cryptocoin": "0.015",
+            "cryptocoin_id": "1",
+            "cryptocoin_symbol": symbol,
+            "fiat_id": "1",
+            "amount_fiat": amount_fiat,
+            "amount_cryptocoin": amount_crypto,
             "price": "65000.00",
             "fee": "1.49",
-            "time": "2025-06-01T12:00:00Z",
         },
-        {
-            "id": "trade-2",
-            "type": "sell",
-            "status": "finished",
-            "cryptocoin_id": "a-eth",
-            "cryptocoin_symbol": "ETH",
-            "fiat_id": "f-eur",
-            "amount_fiat": "500.00",
-            "amount_cryptocoin": "0.15",
-            "price": "3500.00",
-            "fee": "0.75",
-            "time": "2025-06-02T10:00:00Z",
-        },
+    }
+
+
+TRADES_RESPONSE = {
+    "data": [
+        _trade("trade-1", "buy", "BTC", "1000.00", "0.015"),
+        _trade("trade-2", "sell", "ETH", "500.00", "0.15"),
     ],
-    "has_next_page": False,
-    "page_size": 25,
+    "meta": {"total_count": 2, "page_size": 25, "page": 1, "page_number": 1},
+    "links": {"self": "?page_number=1&page_size=25"},
 }
 
 
@@ -51,26 +46,29 @@ async def test_list_trades(mcp_client, mock_router: respx.MockRouter) -> None:
 async def test_list_trades_filter_type(mcp_client, mock_router: respx.MockRouter) -> None:
     buy_only = {
         "data": [TRADES_RESPONSE["data"][0]],
-        "has_next_page": False,
-        "page_size": 25,
+        "meta": {"total_count": 1, "page_size": 25, "page": 1, "page_number": 1},
     }
-    mock_router.get("/v1/trades").respond(json=buy_only)
+    route = mock_router.get("/v1/trades").respond(json=buy_only)
 
     result = await mcp_client.call_tool("list_trades", {"trade_type": "buy"})
     assert result.data["count"] == 1
     assert result.data["trades"][0]["type"] == "buy"
+    assert "type=buy" in str(route.calls[0].request.url)
 
 
-async def test_list_trades_with_type_filter_client(
-    bp_client: BitpandaClient, mock_router: respx.MockRouter
-) -> None:
-    mock_router.get("/v1/trades").respond(json={"data": [], "has_next_page": False})
+async def test_list_trades_empty(bp_client: BitpandaClient, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/trades").respond(
+        json={"data": [], "meta": {"total_count": 0, "page_size": 25, "page": 1, "page_number": 1}}
+    )
     trades = await bp_client.list_trades(trade_type="buy")
     assert trades == []
 
 
 async def test_list_trades_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/trades").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
+    """A record missing the required ``id`` field fails Trade validation."""
+    mock_router.get("/v1/trades").respond(
+        json={"data": [{"type": "trade", "attributes": {"type": "buy"}}], "meta": {"total_count": 1}}
+    )
     with pytest.raises(ToolError, match="Unexpected API response"):
         await mcp_client.call_tool("list_trades", {})
 

@@ -51,28 +51,19 @@ pip install dist/bitpanda_mcp-*.whl
 bitpanda-mcp
 ```
 
-## Tools (10)
+## Tools (7)
 
 | Tool | Tags | Description |
 |------|------|-------------|
 | `get_portfolio` | portfolio | Aggregated portfolio view with EUR valuations |
-| `get_price` | market-data | Current price for an asset by symbol (BTC, ETH, etc.) |
-| `get_asset` | assets | Asset metadata by UUID |
-| `list_assets` | assets | List available assets, filter by type |
-| `list_wallets` | wallets | Crypto wallet balances (with non_zero filter) |
-| `list_fiat_wallets` | wallets | Fiat currency wallets (EUR, USD, GBP, CHF) |
-| `list_transactions` | transactions | General transactions with filters |
-| `list_fiat_transactions` | transactions | Fiat wallet transactions |
-| `list_crypto_transactions` | transactions | Crypto wallet transactions |
-| `list_trades` | trades | Buy/sell trade history |
+| `get_price` | market-data | Current EUR price for an asset by symbol (BTC, ETH, etc.) |
+| `list_wallets` | wallets | Crypto wallet balances (with `non_zero` filter) |
+| `list_fiat_wallets` | wallets | Fiat currency wallets (EUR, USD, GBP, CHF, ...) |
+| `list_fiat_transactions` | transactions | Fiat wallet transactions (with optional `status` filter) |
+| `list_crypto_transactions` | transactions | Crypto wallet transactions (deposits, withdrawals, transfers) |
+| `list_trades` | trades | Buy/sell trade history (with optional `trade_type` filter) |
 
 All tools are read-only and annotated with `readOnlyHint=true`.
-
-## Resources
-
-| URI | Description |
-|-----|-------------|
-| `bitpanda://assets/catalog` | Full catalog of available assets |
 
 ## Prompts
 
@@ -120,7 +111,7 @@ Health check: `GET /healthz` returns `{"status": "ok"}`.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `BITPANDA_API_KEY` | stdio only | — | Bitpanda API key (in HTTP mode, sent per-request as Bearer token) |
-| `BITPANDA_BASE_URL` | No | `https://developer.bitpanda.com` | API base URL |
+| `BITPANDA_BASE_URL` | No | `https://api.bitpanda.com` | API base URL |
 | `REQUEST_TIMEOUT_S` | No | `30` | HTTP timeout (seconds) |
 | `FASTMCP_TRANSPORT` | No | `stdio` | Transport: `stdio` or `streamable-http` |
 | `FASTMCP_HOST` | No | `127.0.0.1` | HTTP bind address |

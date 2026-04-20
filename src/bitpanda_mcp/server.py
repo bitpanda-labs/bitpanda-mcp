@@ -15,8 +15,6 @@ from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.config import Settings
 from bitpanda_mcp.logging import configure_logging
 from bitpanda_mcp.prompts import portfolio as portfolio_prompts
-from bitpanda_mcp.resources import assets as asset_resources
-from bitpanda_mcp.tools import assets as asset_tools
 from bitpanda_mcp.tools import market as market_tools
 from bitpanda_mcp.tools import portfolio as portfolio_tools
 from bitpanda_mcp.tools import trading as trading_tools
@@ -62,7 +60,7 @@ mcp = FastMCP(
         "Use get_price to check a specific asset price by symbol (e.g. BTC, ETH). "
         "Use list_trades to see recent buy/sell activity. "
         "Use list_wallets and list_fiat_wallets to see crypto and fiat balances separately. "
-        "Use list_transactions, list_fiat_transactions, or list_crypto_transactions for detailed history. "
+        "Use list_fiat_transactions or list_crypto_transactions for detailed history. "
         "All data comes from the Bitpanda API and requires a valid API key."
     ),
     lifespan=lifespan,
@@ -75,24 +73,16 @@ mcp.tool(annotations=READONLY, tags={"portfolio"})(portfolio_tools.get_portfolio
 # --- Tools: Market data ---
 mcp.tool(annotations=READONLY, tags={"market-data"})(market_tools.get_price)
 
-# --- Tools: Assets ---
-mcp.tool(annotations=READONLY, tags={"assets"})(asset_tools.get_asset)
-mcp.tool(annotations=READONLY, tags={"assets"})(asset_tools.list_assets)
-
 # --- Tools: Wallets ---
 mcp.tool(annotations=READONLY, tags={"wallets"})(wallet_tools.list_wallets)
 mcp.tool(annotations=READONLY, tags={"wallets"})(wallet_tools.list_fiat_wallets)
 
 # --- Tools: Transactions ---
-mcp.tool(annotations=READONLY, tags={"transactions"})(transaction_tools.list_transactions)
 mcp.tool(annotations=READONLY, tags={"transactions"})(transaction_tools.list_fiat_transactions)
 mcp.tool(annotations=READONLY, tags={"transactions"})(transaction_tools.list_crypto_transactions)
 
 # --- Tools: Trades ---
 mcp.tool(annotations=READONLY, tags={"trades"})(trading_tools.list_trades)
-
-# --- Resources ---
-mcp.resource("bitpanda://assets/catalog")(asset_resources.get_asset_catalog)
 
 # --- Prompts ---
 mcp.prompt()(portfolio_prompts.portfolio_summary)

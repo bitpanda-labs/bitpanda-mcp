@@ -3,12 +3,32 @@ from typing import Any
 
 import httpx
 
-from bitpanda_mcp.models.common import BitpandaAPIError, CursorPage
+from bitpanda_mcp.models.common import BitpandaAPIError, Page
 
 _ERROR_THRESHOLD = 400
 _MAX_PAGES = 500
 
 _log = logging.getLogger(__name__)
+
+
+def flatten_jsonapi(record: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a JSON:API ``{id, type, attributes: {...}}`` record to a single-level dict.
+
+    Non-dict inputs and records without ``attributes`` are returned unchanged.
+    ``id`` and ``type`` are preserved at the top level, attributes take precedence
+    for any other keys.
+    """
+    if not isinstance(record, dict):
+        return record
+    attrs = record.get("attributes")
+    if not isinstance(attrs, dict):
+        return record
+    out: dict[str, Any] = {**attrs}
+    if "id" in record:
+        out["id"] = record["id"]
+    if "type" in record and "type" not in attrs:
+        out["type"] = record["type"]
+    return out
 
 
 class BaseClient:
@@ -18,7 +38,7 @@ class BaseClient:
         self._http = http
         self._auth_headers = auth_headers
 
-    async def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Perform an authenticated GET request and return parsed JSON.
 
         Raises ``BitpandaAPIError`` on non-2xx/3xx responses, network errors,
@@ -44,42 +64,53 @@ class BaseClient:
         *,
         params: dict[str, Any] | None = None,
         page_size: int = 25,
-        cursor_param: str = "after",
         limit: int = 0,
     ) -> list[dict[str, Any]]:
-        """Fetch all pages of a cursor-paginated endpoint.
+        """Fetch all pages of a page-numbered endpoint and flatten JSON:API records.
+
+        Bitpanda collection responses have shape::
+
+            {"data": [{"id": "...", "type": "...", "attributes": {...}}],
+             "meta": {"total_count": N, "page_size": K, "page_number": P},
+             "links": {...}}
+
+        Pagination advances via the ``page`` query parameter. When a page returns
+        fewer than ``page_size`` items, or when we've accumulated ``total_count``
+        items, we stop.
 
         Args:
             path: API path.
             params: Extra query parameters (filters).
             page_size: Items per page.
-            cursor_param: Name of the cursor query parameter ("after" or "cursor").
             limit: Max total items to return. 0 means unlimited.
 
         Returns:
-            Flat list of all ``data`` items across pages.
+            Flat list of flattened records across all pages.
 
         """
         all_items: list[dict[str, Any]] = []
-        request_params = dict(params or {})
-        request_params["page_size"] = page_size
-        cursor: str | None = None
+        base_params = dict(params or {})
+        base_params["page_size"] = page_size
+        page_number = 1
 
         for _ in range(_MAX_PAGES):
-            if cursor:
-                request_params[cursor_param] = cursor
-
+            request_params = {**base_params, "page": page_number}
             raw = await self._get(path, request_params)
-            page = CursorPage.model_validate(raw)
-            all_items.extend(page.data)
+            page = Page.model_validate(raw)
+            all_items.extend(flatten_jsonapi(item) for item in page.data)
 
             if limit and len(all_items) >= limit:
                 return all_items[:limit]
 
-            if not page.has_next_page or not page.cursor:
+            # Stop if the page was short (fewer items than requested), or we've
+            # reached total_count, or data came back empty.
+            total = page.meta.total_count
+            if not page.data or len(page.data) < page_size:
+                break
+            if total and len(all_items) >= total:
                 break
 
-            cursor = page.cursor
+            page_number += 1
 
         return all_items
 
@@ -92,7 +123,8 @@ def _extract_error_detail(resp: httpx.Response) -> str:
             return body["message"]
         errors = body.get("errors")
         if errors and isinstance(errors, list):
-            return errors[0].get("title", resp.text)
+            first = errors[0]
+            return first.get("title") or first.get("detail") or resp.text
         return resp.text
     except Exception:
         return resp.text

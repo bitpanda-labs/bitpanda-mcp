@@ -7,7 +7,7 @@ def test_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BITPANDA_API_KEY", "my-key")
     s = Settings()
     assert s.bitpanda_api_key == "my-key"
-    assert s.bitpanda_base_url == "https://developer.bitpanda.com"
+    assert s.bitpanda_base_url == "https://api.bitpanda.com"
     assert s.request_timeout_s == 30.0
     assert s.server_transport == "stdio"
 

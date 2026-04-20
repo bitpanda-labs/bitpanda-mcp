@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BitpandaAPIError(Exception):
@@ -16,19 +16,25 @@ class BitpandaAPIError(Exception):
         return self.status_code in (401, 403)
 
 
-class CursorPage(BaseModel):
-    """Generic cursor-paginated response wrapper."""
+class PageMeta(BaseModel):
+    """Pagination metadata envelope returned by Bitpanda collection endpoints."""
 
     model_config = ConfigDict(extra="ignore")
 
-    data: list[dict[str, Any]]
-    has_next_page: bool = False
-    has_previous_page: bool = False
-    end_cursor: str | None = None
-    next_cursor: str | None = None
-    page_size: int | str | None = None
+    total_count: int = 0
+    page_size: int | None = None
+    page: int | None = None
+    page_number: int | None = None
 
-    @property
-    def cursor(self) -> str | None:
-        """Return the cursor for the next page, handling both field names."""
-        return self.next_cursor or self.end_cursor
+
+class Page(BaseModel):
+    """Generic page-based response wrapper.
+
+    Real responses have shape
+    ``{"data": [...], "meta": {"total_count", "page_size", "page_number"}, "links": {...}}``.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    data: list[dict[str, Any]] = Field(default_factory=list)
+    meta: PageMeta = Field(default_factory=PageMeta)

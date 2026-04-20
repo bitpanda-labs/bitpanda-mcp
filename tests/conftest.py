@@ -9,8 +9,6 @@ from fastmcp import Client, FastMCP
 
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.prompts import portfolio as portfolio_prompts
-from bitpanda_mcp.resources import assets as asset_resources
-from bitpanda_mcp.tools import assets as asset_tools
 from bitpanda_mcp.tools import market as market_tools
 from bitpanda_mcp.tools import portfolio as portfolio_tools
 from bitpanda_mcp.tools import trading as trading_tools
@@ -41,18 +39,14 @@ async def bp_client(mock_router: respx.MockRouter, bp_base_url: str) -> Bitpanda
 
 
 def _register_all(server: FastMCP) -> None:
-    """Register all Bitpanda tools, resources, and prompts on the server."""
-    server.tool()(asset_tools.get_asset)
-    server.tool()(asset_tools.list_assets)
+    """Register all Bitpanda tools and prompts on the server."""
     server.tool()(wallet_tools.list_wallets)
     server.tool()(wallet_tools.list_fiat_wallets)
-    server.tool()(transaction_tools.list_transactions)
     server.tool()(transaction_tools.list_fiat_transactions)
     server.tool()(transaction_tools.list_crypto_transactions)
     server.tool()(trading_tools.list_trades)
     server.tool()(market_tools.get_price)
     server.tool()(portfolio_tools.get_portfolio)
-    server.resource("bitpanda://assets/catalog")(asset_resources.get_asset_catalog)
     server.prompt()(portfolio_prompts.portfolio_summary)
     server.prompt()(portfolio_prompts.recent_activity)
 

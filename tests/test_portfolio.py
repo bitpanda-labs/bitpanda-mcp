@@ -1,80 +1,50 @@
-import httpx
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
+
+from bitpanda_mcp.tools.portfolio import get_portfolio
 
 
-def _wallet_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(
-        200,
-        json={
-            "data": [
-                {
-                    "wallet_id": "w1",
-                    "asset_id": "a-btc",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-01T00:00:00Z",
-                    "balance": 0.5,
-                },
-                {
-                    "wallet_id": "w2",
-                    "asset_id": "a-eth",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-02T00:00:00Z",
-                    "balance": 2.0,
-                },
-                {
-                    "wallet_id": "w3",
-                    "asset_id": "a-doge",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-03T00:00:00Z",
-                    "balance": 0.0,
-                },
-                {
-                    "wallet_id": "w4",
-                    "asset_id": "a-unknown",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-04T00:00:00Z",
-                    "balance": 100.0,
-                },
-            ],
-            "has_next_page": False,
-            "page_size": 25,
+def _wallet(wid: str, symbol: str, balance: str) -> dict:
+    return {
+        "type": "wallet",
+        "id": wid,
+        "attributes": {
+            "cryptocoin_id": "1",
+            "cryptocoin_symbol": symbol,
+            "balance": balance,
+            "is_default": True,
+            "name": f"{symbol} Wallet",
+            "pending_transactions_count": 0,
+            "deleted": False,
+            "is_index": False,
         },
-    )
+    }
 
 
-TICKER_DATA = {
+WALLETS_RESPONSE = {
     "data": [
-        {
-            "id": "a-btc",
-            "name": "Bitcoin",
-            "symbol": "BTC",
-            "type": "cryptocoin",
-            "price": "65000.00",
-            "price_change_day": "2.5",
-        },
-        {
-            "id": "a-eth",
-            "name": "Ethereum",
-            "symbol": "ETH",
-            "type": "cryptocoin",
-            "price": "3500.00",
-            "price_change_day": "-1.2",
-        },
+        _wallet("w1", "BTC", "0.5"),
+        _wallet("w2", "ETH", "2.0"),
+        _wallet("w3", "DOGE", "0.0"),
+        _wallet("w4", "UNKNOWN", "100.0"),
     ],
-    "has_next_page": False,
-    "page_size": 100,
+    "last_user_action": {"date_iso8601": "2026-04-20T10:00:00+02:00", "unix": "1776675000"},
+}
+
+TICKER_FLAT = {
+    "BTC": {"EUR": "65000.00"},
+    "ETH": {"EUR": "3500.00"},
+    "DOGE": {"EUR": "0.10"},
 }
 
 
 async def test_get_portfolio(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").mock(side_effect=_wallet_handler)
-    mock_router.get("/v1/ticker").respond(json=TICKER_DATA)
+    mock_router.get("/v1/wallets").respond(json=WALLETS_RESPONSE)
+    mock_router.get("/v1/ticker").respond(json=TICKER_FLAT)
 
     result = await mcp_client.call_tool("get_portfolio", {})
     data = result.data
@@ -87,68 +57,59 @@ async def test_get_portfolio(mcp_client, mock_router: respx.MockRouter) -> None:
     assert data["holdings"][1]["symbol"] == "ETH"
     assert data["holdings"][1]["value_eur"] == 7000.0
 
-    # a-unknown has balance but is missing from ticker — surfaced, not silently dropped
-    assert data["skipped_asset_ids"] == ["a-unknown"]
+    # UNKNOWN has a balance but no ticker entry — surfaced, not silently dropped
+    assert data["skipped_symbols"] == ["UNKNOWN"]
 
 
 async def test_get_portfolio_sort_by_name(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").mock(side_effect=_wallet_handler)
-    mock_router.get("/v1/ticker").respond(json=TICKER_DATA)
+    mock_router.get("/v1/wallets").respond(json=WALLETS_RESPONSE)
+    mock_router.get("/v1/ticker").respond(json=TICKER_FLAT)
 
     result = await mcp_client.call_tool("get_portfolio", {"sort_by": "name"})
     holdings = result.data["holdings"]
-    # Sorted alphabetically by asset name
-    assert holdings[0]["name"] == "Bitcoin"
-    assert holdings[1]["name"] == "Ethereum"
+    assert [h["symbol"] for h in holdings] == ["BTC", "ETH"]
 
 
 async def test_get_portfolio_non_numeric_price(mcp_client, mock_router: respx.MockRouter) -> None:
     """Non-numeric ticker price falls back to 0."""
-    mock_router.get("/v1/wallets/").respond(
-        json={
-            "data": [
-                {
-                    "wallet_id": "w1",
-                    "asset_id": "a1",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-01T00:00:00Z",
-                    "balance": 10.0,
-                },
-            ],
-            "has_next_page": False,
-            "page_size": 25,
-        },
+    mock_router.get("/v1/wallets").respond(
+        json={"data": [_wallet("w1", "BRK", "10.0")], "last_user_action": {}}
     )
-    mock_router.get("/v1/ticker").respond(
-        json={
-            "data": [
-                {
-                    "id": "a1",
-                    "name": "Broken",
-                    "symbol": "BRK",
-                    "price": "not-a-number",
-                    "price_change_day": "0",
-                    "type": "test",
-                },
-            ],
-            "has_next_page": False,
-            "page_size": 100,
-        },
-    )
+    mock_router.get("/v1/ticker").respond(json={"BRK": {"EUR": "not-a-number"}})
 
     result = await mcp_client.call_tool("get_portfolio", {})
     assert result.data["holdings"][0]["value_eur"] == 0.0
 
 
-async def test_get_portfolio_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
-    with pytest.raises(ToolError, match="Unexpected API response"):
-        await mcp_client.call_tool("get_portfolio", {})
-
-
 async def test_get_portfolio_error(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").respond(status_code=401, json={"message": "Unauthorized"})
+    mock_router.get("/v1/wallets").respond(status_code=401, json={"message": "Unauthorized"})
 
     with pytest.raises(ToolError, match="Unauthorized"):
         await mcp_client.call_tool("get_portfolio", {})
+
+
+async def test_get_portfolio_skips_wallet_without_symbol(mcp_client, mock_router: respx.MockRouter) -> None:
+    """A wallet whose cryptocoin_symbol is empty is skipped from the portfolio aggregation."""
+    empty_symbol_wallet = _wallet("w1", "", "1.0")
+    mock_router.get("/v1/wallets").respond(json={"data": [empty_symbol_wallet, _wallet("w2", "BTC", "0.5")]})
+    mock_router.get("/v1/ticker").respond(json={"BTC": {"EUR": "65000.00"}})
+
+    result = await mcp_client.call_tool("get_portfolio", {})
+    # Only BTC should appear; the symbol-less wallet is skipped silently.
+    assert [h["symbol"] for h in result.data["holdings"]] == ["BTC"]
+
+
+async def test_get_portfolio_validation_error_direct() -> None:
+    ctx = MagicMock()
+    bp = MagicMock()
+    bp.list_wallets = AsyncMock(
+        side_effect=ValidationError.from_exception_data(
+            "Wallet", [{"type": "missing", "loc": ("id",), "msg": "missing", "input": {}}]
+        )
+    )
+    ctx.lifespan_context = {"bp": bp}
+    with (
+        patch("bitpanda_mcp.tools.portfolio.get_bp_client", return_value=bp),
+        pytest.raises(ToolError, match="Unexpected API response"),
+    ):
+        await get_portfolio(ctx)

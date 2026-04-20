@@ -6,36 +6,39 @@ from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.common import BitpandaAPIError
 
 
-async def get_portfolio(
-    ctx: Context,
-    sort_by: str = "value",
-) -> dict:
+async def get_portfolio(ctx: Context, sort_by: str = "value") -> dict:  # noqa: C901
     """Get an aggregated portfolio view with current EUR valuations.
 
-    Returns each held asset with balance, price, and EUR value. Sorted by 'value' (default) or 'name'.
+    Returns each held asset with balance, price, and EUR value. Sorted by
+    ``value`` (default) or ``name``.
     """
     try:
-        wallets = await get_bp_client(ctx).list_wallets()
-        ticker = await get_bp_client(ctx).fetch_ticker()
+        client = get_bp_client(ctx)
+        wallets = await client.list_wallets()
+        ticker = await client.fetch_ticker()
 
-        # Aggregate balances by asset_id (multiple wallets can hold the same asset)
         balances: dict[str, float] = {}
         for w in wallets:
-            if w.balance > 0:
-                balances[w.asset_id] = balances.get(w.asset_id, 0.0) + w.balance
+            bal = w.balance_float
+            if bal <= 0:
+                continue
+            key = w.cryptocoin_symbol.upper()
+            if not key:
+                continue
+            balances[key] = balances.get(key, 0.0) + bal
 
-        holdings = []
-        skipped_asset_ids: list[str] = []
+        holdings: list[dict] = []
+        skipped_symbols: list[str] = []
         total_eur = 0.0
 
-        for asset_id, balance in balances.items():
-            entry = ticker.get_by_id(asset_id)
+        for symbol, balance in balances.items():
+            entry = ticker.get_by_symbol(symbol)
             if not entry:
-                skipped_asset_ids.append(asset_id)
+                skipped_symbols.append(symbol)
                 continue
 
             try:
-                price = float(entry.price)
+                price = float(entry.price_eur)
             except (ValueError, TypeError):
                 price = 0.0
 
@@ -44,18 +47,15 @@ async def get_portfolio(
 
             holdings.append(
                 {
-                    "asset_id": asset_id,
-                    "name": entry.name,
-                    "symbol": entry.symbol,
-                    "type": entry.type,
+                    "symbol": symbol,
                     "balance": balance,
-                    "price_eur": entry.price,
+                    "price_eur": entry.price_eur,
                     "value_eur": round(eur_value, 2),
                 }
             )
 
         if sort_by == "name":
-            holdings.sort(key=lambda h: h["name"].lower())
+            holdings.sort(key=lambda h: h["symbol"])
         else:
             holdings.sort(key=lambda h: h["value_eur"], reverse=True)
 
@@ -64,8 +64,8 @@ async def get_portfolio(
             "total_value_eur": round(total_eur, 2),
             "holdings": holdings,
         }
-        if skipped_asset_ids:
-            result["skipped_asset_ids"] = skipped_asset_ids
+        if skipped_symbols:
+            result["skipped_symbols"] = skipped_symbols
         return result
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e

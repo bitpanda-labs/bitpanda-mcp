@@ -1,134 +1,96 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
 
-from bitpanda_mcp.clients.bitpanda import BitpandaClient
-from bitpanda_mcp.tools.wallets import list_fiat_wallets
+from bitpanda_mcp.models.wallets import Wallet
+from bitpanda_mcp.tools.wallets import list_fiat_wallets, list_wallets
 
 
-def _wallet_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(
-        200,
-        json={
-            "data": [
-                {
-                    "wallet_id": "w1",
-                    "asset_id": "a1",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-01T00:00:00Z",
-                    "balance": 1.5,
-                },
-                {
-                    "wallet_id": "w2",
-                    "asset_id": "a2",
-                    "wallet_type": "STAKING",
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-02T00:00:00Z",
-                    "balance": 0.0,
-                },
-            ],
-            "has_next_page": False,
-            "page_size": 25,
+def _wallet_record(wid: str, symbol: str, balance: str) -> dict:
+    return {
+        "type": "wallet",
+        "id": wid,
+        "attributes": {
+            "cryptocoin_id": "1",
+            "cryptocoin_symbol": symbol,
+            "balance": balance,
+            "is_default": True,
+            "name": f"{symbol} Wallet",
+            "pending_transactions_count": 0,
+            "deleted": False,
+            "is_index": False,
         },
-    )
+    }
+
+
+WALLETS_RESPONSE = {
+    "data": [
+        _wallet_record("w1", "BTC", "0.05"),
+        _wallet_record("w2", "ETH", "0.00"),
+    ],
+    "last_user_action": {"date_iso8601": "2026-04-20T10:00:00+02:00", "unix": "1776675000"},
+}
+
+
+def _fiat_record(fid: str, symbol: str, balance: str) -> dict:
+    return {
+        "type": "fiat_wallet",
+        "id": fid,
+        "attributes": {
+            "fiat_id": "1",
+            "fiat_symbol": symbol,
+            "balance": balance,
+            "name": f"{symbol} Wallet",
+            "pending_transactions_count": 0,
+        },
+    }
 
 
 async def test_list_wallets(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").mock(side_effect=_wallet_handler)
+    mock_router.get("/v1/wallets").respond(json=WALLETS_RESPONSE)
 
     result = await mcp_client.call_tool("list_wallets", {})
     assert result.data["count"] == 2
-    assert result.data["wallets"][0]["wallet_id"] == "w1"
+    wallets = result.data["wallets"]
+    assert wallets[0]["id"] == "w1"
+    assert wallets[0]["cryptocoin_symbol"] == "BTC"
+    assert wallets[0]["balance"] == "0.05"
 
 
 async def test_list_wallets_non_zero(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").mock(side_effect=_wallet_handler)
+    mock_router.get("/v1/wallets").respond(json=WALLETS_RESPONSE)
 
     result = await mcp_client.call_tool("list_wallets", {"non_zero": True})
     assert result.data["count"] == 1
-    assert result.data["wallets"][0]["balance"] == 1.5
+    assert result.data["wallets"][0]["cryptocoin_symbol"] == "BTC"
 
 
 async def test_list_wallets_error(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").respond(status_code=401, json={"message": "Bad key"})
+    mock_router.get("/v1/wallets").respond(status_code=401, json={"message": "Bad key"})
 
     with pytest.raises(ToolError, match="Bad key"):
         await mcp_client.call_tool("list_wallets", {})
 
 
-async def test_list_wallets_with_asset_id_filter(
-    bp_client: BitpandaClient, mock_router: respx.MockRouter
-) -> None:
-    mock_router.get("/v1/wallets/").respond(
-        json={
-            "data": [
-                {
-                    "wallet_id": "w1",
-                    "asset_id": "a1",
-                    "wallet_type": None,
-                    "index_asset_id": None,
-                    "last_credited_at": "2025-01-01T00:00:00Z",
-                    "balance": 1.0,
-                }
-            ],
-            "has_next_page": False,
-        }
-    )
-    wallets = await bp_client.list_wallets(asset_id="a1")
-    assert len(wallets) == 1
+async def test_list_wallets_empty_data(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/wallets").respond(json={"data": []})
+
+    result = await mcp_client.call_tool("list_wallets", {})
+    assert result.data == {"count": 0, "wallets": []}
 
 
-async def test_list_wallets_with_index_asset_id_filter(
-    bp_client: BitpandaClient, mock_router: respx.MockRouter
-) -> None:
-    route = mock_router.get("/v1/wallets/").respond(
-        json={
-            "data": [
-                {
-                    "wallet_id": "w1",
-                    "asset_id": "a1",
-                    "wallet_type": "CRYPTO_INDEX",
-                    "index_asset_id": "idx-1",
-                    "last_credited_at": "2025-01-01T00:00:00Z",
-                    "balance": 5.0,
-                }
-            ],
-            "has_next_page": False,
-        }
-    )
-    wallets = await bp_client.list_wallets(index_asset_id="idx-1")
-    assert len(wallets) == 1
-    assert "index_asset_id=idx-1" in str(route.calls[0].request.url)
+async def test_list_fiat_wallets(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/fiatwallets").respond(json={"data": [_fiat_record("fw1", "EUR", "1500.00")]})
 
-
-async def test_list_wallets_with_date_filters(
-    bp_client: BitpandaClient, mock_router: respx.MockRouter
-) -> None:
-    route = mock_router.get("/v1/wallets/").respond(json={"data": [], "has_next_page": False})
-    await bp_client.list_wallets(
-        last_credited_at_from="2025-01-01T00:00:00Z",
-        last_credited_at_to="2025-06-01T00:00:00Z",
-    )
-    request_url = str(route.calls[0].request.url)
-    assert "last_credited_at_from_including=2025-01-01" in request_url
-    assert "last_credited_at_to_excluding=2025-06-01" in request_url
-
-
-async def test_list_wallets_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/").respond(json={"data": [{"bad": "shape"}], "has_next_page": False})
-    with pytest.raises(ToolError, match="Unexpected API response"):
-        await mcp_client.call_tool("list_wallets", {})
-
-
-async def test_list_fiat_wallets_invalid_response(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/fiatwallets").respond(json={"data": [{"bad": "shape"}]})
-    with pytest.raises(ToolError, match="Unexpected API response"):
-        await mcp_client.call_tool("list_fiat_wallets", {})
+    result = await mcp_client.call_tool("list_fiat_wallets", {})
+    assert result.data["count"] == 1
+    fw = result.data["fiat_wallets"][0]
+    assert fw["id"] == "fw1"
+    assert fw["fiat_symbol"] == "EUR"
+    assert fw["balance"] == "1500.00"
 
 
 async def test_list_fiat_wallets_error(mcp_client, mock_router: respx.MockRouter) -> None:
@@ -151,23 +113,22 @@ async def test_list_fiat_wallets_validation_error_direct() -> None:
         await list_fiat_wallets(ctx)
 
 
-async def test_list_fiat_wallets(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/fiatwallets").respond(
-        json={
-            "data": [
-                {
-                    "id": "fw1",
-                    "type": "fiat",
-                    "fiat_id": "f-eur",
-                    "fiat_symbol": "EUR",
-                    "balance": "1500.00",
-                    "name": "EUR Wallet",
-                },
-            ],
-        }
+async def test_list_wallets_validation_error_direct() -> None:
+    ctx = MagicMock()
+    bp = MagicMock()
+    bp.list_wallets = AsyncMock(
+        side_effect=ValidationError.from_exception_data(
+            "Wallet", [{"type": "missing", "loc": ("id",), "msg": "missing", "input": {}}]
+        )
     )
+    ctx.lifespan_context = {"bp": bp}
+    with (
+        patch("bitpanda_mcp.tools.wallets.get_bp_client", return_value=bp),
+        pytest.raises(ToolError, match="Unexpected API response"),
+    ):
+        await list_wallets(ctx)
 
-    result = await mcp_client.call_tool("list_fiat_wallets", {})
-    assert result.data["count"] == 1
-    assert result.data["fiat_wallets"][0]["fiat_symbol"] == "EUR"
-    assert result.data["fiat_wallets"][0]["balance"] == "1500.00"
+
+def test_wallet_balance_float_non_numeric() -> None:
+    w = Wallet(id="w1", balance="not-a-number")
+    assert w.balance_float == 0.0
