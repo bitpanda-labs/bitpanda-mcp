@@ -61,7 +61,7 @@ All tools are read-only and annotated with `readOnlyHint=true`.
 
 ## Remote Hosting (HTTP Mode)
 
-The server can also run as a remote HTTP service (e.g. at `mcp.bitpanda.com`). Users connect with a URL and pass their Bitpanda API key as a Bearer token.
+The server can also run as a remote HTTP service. Users connect with a URL and pass their Bitpanda API key as a Bearer token.
 
 ### Run the HTTP server
 
@@ -82,7 +82,7 @@ docker run -p 8000:8000 bitpanda-mcp
 {
   "mcpServers": {
     "bitpanda": {
-      "url": "https://mcp.bitpanda.com/mcp",
+      "url": "http://localhost:8000/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_BITPANDA_API_KEY"
       }
