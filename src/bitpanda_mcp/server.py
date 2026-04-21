@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -23,6 +23,29 @@ from bitpanda_mcp.tools import wallets as wallet_tools
 
 READONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
+_TOOLS: list[tuple[Callable[..., Any], set[str]]] = [
+    (portfolio_tools.get_portfolio, {"portfolio"}),
+    (market_tools.get_price, {"market-data"}),
+    (wallet_tools.list_wallets, {"wallets"}),
+    (wallet_tools.list_fiat_wallets, {"wallets"}),
+    (transaction_tools.list_fiat_transactions, {"transactions"}),
+    (transaction_tools.list_crypto_transactions, {"transactions"}),
+    (trading_tools.list_trades, {"trades"}),
+]
+
+_PROMPTS: list[Callable[..., Any]] = [
+    portfolio_prompts.portfolio_summary,
+    portfolio_prompts.recent_activity,
+]
+
+
+def register(server: FastMCP) -> None:
+    """Register every Bitpanda tool and prompt on ``server``."""
+    for fn, tags in _TOOLS:
+        server.tool(annotations=READONLY, tags=tags)(fn)
+    for prompt in _PROMPTS:
+        server.prompt()(prompt)
+
 
 @asynccontextmanager
 async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
@@ -33,7 +56,6 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
       per-request clients are built from the caller's Bearer token in ``get_bp_client()``.
     """
     settings = Settings()
-    configure_logging(json_output=settings.server_transport != "stdio")
     log = logging.getLogger(__name__)
     log.info("server_start", extra={"transport": settings.server_transport, "version": __version__})
 
@@ -67,26 +89,7 @@ mcp = FastMCP(
     auth=BearerKeyVerifier(),
 )
 
-# --- Tools: Portfolio ---
-mcp.tool(annotations=READONLY, tags={"portfolio"})(portfolio_tools.get_portfolio)
-
-# --- Tools: Market data ---
-mcp.tool(annotations=READONLY, tags={"market-data"})(market_tools.get_price)
-
-# --- Tools: Wallets ---
-mcp.tool(annotations=READONLY, tags={"wallets"})(wallet_tools.list_wallets)
-mcp.tool(annotations=READONLY, tags={"wallets"})(wallet_tools.list_fiat_wallets)
-
-# --- Tools: Transactions ---
-mcp.tool(annotations=READONLY, tags={"transactions"})(transaction_tools.list_fiat_transactions)
-mcp.tool(annotations=READONLY, tags={"transactions"})(transaction_tools.list_crypto_transactions)
-
-# --- Tools: Trades ---
-mcp.tool(annotations=READONLY, tags={"trades"})(trading_tools.list_trades)
-
-# --- Prompts ---
-mcp.prompt()(portfolio_prompts.portfolio_summary)
-mcp.prompt()(portfolio_prompts.recent_activity)
+register(mcp)
 
 
 # --- Health check (HTTP mode only) ---
@@ -98,6 +101,7 @@ async def health(_request: Request) -> JSONResponse:
 
 def main() -> None:
     """Entry point for `bitpanda-mcp` console script."""
+    configure_logging(json_output=Settings().server_transport != "stdio")
     mcp.run()
 
 

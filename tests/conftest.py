@@ -8,12 +8,7 @@ import respx
 from fastmcp import Client, FastMCP
 
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
-from bitpanda_mcp.prompts import portfolio as portfolio_prompts
-from bitpanda_mcp.tools import market as market_tools
-from bitpanda_mcp.tools import portfolio as portfolio_tools
-from bitpanda_mcp.tools import trading as trading_tools
-from bitpanda_mcp.tools import transactions as transaction_tools
-from bitpanda_mcp.tools import wallets as wallet_tools
+from bitpanda_mcp.server import register
 
 
 @pytest.fixture
@@ -38,19 +33,6 @@ async def bp_client(mock_router: respx.MockRouter, bp_base_url: str) -> Bitpanda
         await http.aclose()
 
 
-def _register_all(server: FastMCP) -> None:
-    """Register all Bitpanda tools and prompts on the server."""
-    server.tool()(wallet_tools.list_wallets)
-    server.tool()(wallet_tools.list_fiat_wallets)
-    server.tool()(transaction_tools.list_fiat_transactions)
-    server.tool()(transaction_tools.list_crypto_transactions)
-    server.tool()(trading_tools.list_trades)
-    server.tool()(market_tools.get_price)
-    server.tool()(portfolio_tools.get_portfolio)
-    server.prompt()(portfolio_prompts.portfolio_summary)
-    server.prompt()(portfolio_prompts.recent_activity)
-
-
 @pytest.fixture
 def mcp_server(mock_router: respx.MockRouter, bp_base_url: str) -> FastMCP:
     """FastMCP server with mocked BitpandaClient (simulates stdio mode)."""
@@ -65,7 +47,7 @@ def mcp_server(mock_router: respx.MockRouter, bp_base_url: str) -> FastMCP:
             await http.aclose()
 
     server = FastMCP(name="test-server", lifespan=test_lifespan)
-    _register_all(server)
+    register(server)
     return server
 
 
