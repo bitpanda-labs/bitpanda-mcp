@@ -10,8 +10,10 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
+# Authorization allows one trailing token to cover the "Bearer <token>" form.
 _STRING_RE = re.compile(
-    r"(X-Api-Key|Authorization)\s*[:=]\s*\S+(?:\s+\S+)*"
+    r"X-Api-Key\s*[:=]\s*\S+"
+    r"|Authorization\s*[:=]\s*\S+(?:\s+\S+)?"
     r"|Bearer\s+\S+",
     re.IGNORECASE,
 )

@@ -26,6 +26,21 @@ def test_redact_standalone_bearer() -> None:
     assert "token123" not in result
 
 
+def test_redact_preserves_trailing_context() -> None:
+    """The regex must not swallow unrelated trailing tokens after the credential."""
+    result = _redact_value("Authorization: Bearer abc request_id=42 user_id=17")
+    assert "abc" not in result
+    assert "request_id=42" in result
+    assert "user_id=17" in result
+
+
+def test_redact_api_key_preserves_trailing_context() -> None:
+    result = _redact_value("X-Api-Key: secret-123 path=/v1/wallets status=200")
+    assert "secret-123" not in result
+    assert "path=/v1/wallets" in result
+    assert "status=200" in result
+
+
 def test_redact_case_insensitive() -> None:
     result = _redact_value("x-api-key: lowercase-key")
     assert "lowercase-key" not in result
