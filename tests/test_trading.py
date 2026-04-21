@@ -18,7 +18,7 @@ def _trade(tid: str, trade_type: str, symbol: str, amount_fiat: str, amount_cryp
             "amount_fiat": amount_fiat,
             "amount_cryptocoin": amount_crypto,
             "price": "65000.00",
-            "fee": "1.49",
+            "fee": {"type": "fee", "attributes": {"fee_amount": "1.49", "fee_type": "flat"}},
         },
     }
 

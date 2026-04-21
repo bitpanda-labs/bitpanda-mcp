@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Trade(BaseModel):
@@ -19,3 +19,13 @@ class Trade(BaseModel):
     price: str = Field(default="0", description="Price per unit in fiat")
     fee: str = Field(default="0", description="Fee amount")
     time: Any = Field(default=None, description="Trade execution timestamp as returned by the API")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_fee(cls, data: Any) -> Any:
+        # The /v1/trades API returns fee as a nested JSON:API object
+        # {type: "fee", attributes: {fee_amount: "1.49", ...}} — extract the amount.
+        if isinstance(data, dict) and isinstance(data.get("fee"), dict):
+            fee_attrs = data["fee"].get("attributes", {})
+            data = {**data, "fee": str(fee_attrs.get("fee_amount", "0"))}
+        return data
