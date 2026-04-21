@@ -23,15 +23,14 @@ class PageMeta(BaseModel):
 
     total_count: int = 0
     page_size: int | None = None
-    page: int | None = None
-    page_number: int | None = None
+    next_cursor: str | None = None
 
 
 class Page(BaseModel):
-    """Generic page-based response wrapper.
+    """Generic cursor-paginated response wrapper.
 
     Real responses have shape
-    ``{"data": [...], "meta": {"total_count", "page_size", "page_number"}, "links": {...}}``.
+    ``{"data": [...], "meta": {"total_count", "page_size", "next_cursor"}, "links": {...}}``.
     """
 
     model_config = ConfigDict(extra="ignore")

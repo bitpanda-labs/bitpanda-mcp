@@ -28,8 +28,7 @@ TRADES_RESPONSE = {
         _trade("trade-1", "buy", "BTC", "1000.00", "0.015"),
         _trade("trade-2", "sell", "ETH", "500.00", "0.15"),
     ],
-    "meta": {"total_count": 2, "page_size": 25, "page": 1, "page_number": 1},
-    "links": {"self": "?page_number=1&page_size=25"},
+    "meta": {"total_count": 2, "page_size": 25, "next_cursor": None},
 }
 
 
@@ -46,7 +45,7 @@ async def test_list_trades(mcp_client, mock_router: respx.MockRouter) -> None:
 async def test_list_trades_filter_type(mcp_client, mock_router: respx.MockRouter) -> None:
     buy_only = {
         "data": [TRADES_RESPONSE["data"][0]],
-        "meta": {"total_count": 1, "page_size": 25, "page": 1, "page_number": 1},
+        "meta": {"total_count": 1, "page_size": 25, "next_cursor": None},
     }
     route = mock_router.get("/v1/trades").respond(json=buy_only)
 
@@ -58,7 +57,7 @@ async def test_list_trades_filter_type(mcp_client, mock_router: respx.MockRouter
 
 async def test_list_trades_empty(bp_client: BitpandaClient, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/trades").respond(
-        json={"data": [], "meta": {"total_count": 0, "page_size": 25, "page": 1, "page_number": 1}}
+        json={"data": [], "meta": {"total_count": 0, "page_size": 25, "next_cursor": None}}
     )
     trades = await bp_client.list_trades(trade_type="buy")
     assert trades == []
@@ -78,3 +77,14 @@ async def test_list_trades_error(mcp_client, mock_router: respx.MockRouter) -> N
 
     with pytest.raises(ToolError, match="Internal error"):
         await mcp_client.call_tool("list_trades", {})
+
+
+async def test_list_trades_fee_plain_string(mcp_client, mock_router: respx.MockRouter) -> None:
+    """Trade.fee accepts a plain string as well as the nested JSON:API object."""
+    trade = _trade("trade-1", "buy", "BTC", "1000.00", "0.015")
+    trade["attributes"]["fee"] = "2.99"
+    mock_router.get("/v1/trades").respond(
+        json={"data": [trade], "meta": {"total_count": 1, "page_size": 25, "next_cursor": None}}
+    )
+    result = await mcp_client.call_tool("list_trades", {})
+    assert result.data["trades"][0]["fee"] == "2.99"

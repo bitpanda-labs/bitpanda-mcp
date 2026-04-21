@@ -42,16 +42,14 @@ def _crypto_tx(tid: str, tx_type: str) -> dict:
     }
 
 
-def _page(records: list[dict], total: int, page_size: int = 25, page_number: int = 1) -> dict:
+def _page(records: list[dict], total: int, page_size: int = 25, next_cursor: str | None = None) -> dict:
     return {
         "data": records,
         "meta": {
             "total_count": total,
             "page_size": page_size,
-            "page": page_number,
-            "page_number": page_number,
+            "next_cursor": next_cursor,
         },
-        "links": {"self": f"?page_number={page_number}&page_size={page_size}"},
     }
 
 

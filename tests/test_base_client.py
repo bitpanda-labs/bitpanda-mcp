@@ -47,7 +47,7 @@ async def test_extract_error_detail_errors_list_with_title(
 async def test_pagination_stops_at_max_pages(
     bp_client: BitpandaClient, mock_router: respx.MockRouter
 ) -> None:
-    """Pagination guard: stops after _MAX_PAGES even if API keeps returning full pages."""
+    """Pagination guard: stops after _MAX_PAGES even if API keeps returning a next_cursor."""
 
     def _always_full(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -57,7 +57,7 @@ async def test_pagination_stops_at_max_pages(
                     {"type": "trade", "id": "t1", "attributes": {"type": "buy"}},
                     {"type": "trade", "id": "t2", "attributes": {"type": "buy"}},
                 ],
-                "meta": {"total_count": 10000, "page_size": 2, "page": 1, "page_number": 1},
+                "meta": {"total_count": 10000, "page_size": 2, "next_cursor": "cursor-abc"},
             },
         )
 
@@ -80,13 +80,15 @@ async def test_pagination_stops_on_short_page(
                 {"type": "trade", "id": "t1", "attributes": {"type": "buy"}},
                 {"type": "trade", "id": "t2", "attributes": {"type": "buy"}},
             ]
+            next_cursor = "cursor-page2"
         else:
             data = [{"type": "trade", "id": "t3", "attributes": {"type": "sell"}}]
+            next_cursor = None
         return httpx.Response(
             200,
             json={
                 "data": data,
-                "meta": {"total_count": 3, "page_size": 2, "page": calls["n"], "page_number": calls["n"]},
+                "meta": {"total_count": 3, "page_size": 2, "next_cursor": next_cursor},
             },
         )
 
@@ -96,14 +98,13 @@ async def test_pagination_stops_on_short_page(
     assert calls["n"] == 2
 
 
-async def test_pagination_stops_when_total_reached(
+async def test_pagination_stops_when_cursor_exhausted(
     bp_client: BitpandaClient, mock_router: respx.MockRouter
 ) -> None:
-    """When accumulated items reach ``meta.total_count`` the paginator stops even if the
-    last page was a full page (otherwise we'd loop forever on equal-total APIs)."""
+    """When API returns no next_cursor on a full page, pagination stops."""
     calls = {"n": 0}
 
-    def _full_until_total(request: httpx.Request) -> httpx.Response:
+    def _two_full_pages(request: httpx.Request) -> httpx.Response:
         calls["n"] += 1
         return httpx.Response(
             200,
@@ -112,13 +113,45 @@ async def test_pagination_stops_when_total_reached(
                     {"type": "trade", "id": f"t{calls['n']}a", "attributes": {"type": "buy"}},
                     {"type": "trade", "id": f"t{calls['n']}b", "attributes": {"type": "buy"}},
                 ],
-                "meta": {"total_count": 4, "page_size": 2, "page": calls["n"], "page_number": calls["n"]},
+                "meta": {
+                    "total_count": 4,
+                    "page_size": 2,
+                    "next_cursor": "cursor-p2" if calls["n"] == 1 else None,
+                },
             },
         )
 
-    mock_router.get("/v1/trades").mock(side_effect=_full_until_total)
+    mock_router.get("/v1/trades").mock(side_effect=_two_full_pages)
     trades = await bp_client.list_trades(page_size=2)
     assert len(trades) == 4
+    assert calls["n"] == 2
+
+
+async def test_pagination_sends_cursor_in_subsequent_requests(
+    bp_client: BitpandaClient, mock_router: respx.MockRouter
+) -> None:
+    """Verify the cursor value from page 1 is sent as a query param in page 2."""
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            assert "cursor" not in str(request.url)
+            next_cursor = "cursor-xyz"
+        else:
+            assert "cursor=cursor-xyz" in str(request.url)
+            next_cursor = None
+        return httpx.Response(
+            200,
+            json={
+                "data": [{"type": "trade", "id": f"t{calls['n']}", "attributes": {"type": "buy"}}],
+                "meta": {"total_count": 2, "page_size": 1, "next_cursor": next_cursor},
+            },
+        )
+
+    mock_router.get("/v1/trades").mock(side_effect=_handler)
+    trades = await bp_client.list_trades(page_size=1)
+    assert len(trades) == 2
     assert calls["n"] == 2
 
 
@@ -130,7 +163,7 @@ async def test_pagination_respects_limit(bp_client: BitpandaClient, mock_router:
                 {"type": "trade", "id": "t2", "attributes": {"type": "buy"}},
                 {"type": "trade", "id": "t3", "attributes": {"type": "buy"}},
             ],
-            "meta": {"total_count": 3, "page_size": 3, "page": 1, "page_number": 1},
+            "meta": {"total_count": 3, "page_size": 3, "next_cursor": None},
         }
     )
     trades = await bp_client.list_trades(page_size=3, limit=2)
@@ -179,7 +212,7 @@ def test_flatten_jsonapi_attrs_type_wins() -> None:
 
 
 def test_flatten_jsonapi_passthrough_non_dict() -> None:
-    assert flatten_jsonapi("not-a-dict") == "not-a-dict"  # type: ignore[arg-type]
+    assert flatten_jsonapi("not-a-dict") == "not-a-dict"
 
 
 def test_flatten_jsonapi_no_attributes() -> None:

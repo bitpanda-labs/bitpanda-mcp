@@ -11,7 +11,7 @@ _MAX_PAGES = 500
 _log = logging.getLogger(__name__)
 
 
-def flatten_jsonapi(record: dict[str, Any]) -> dict[str, Any]:
+def flatten_jsonapi(record: Any) -> Any:
     """Flatten a JSON:API ``{id, type, attributes: {...}}`` record to a single-level dict.
 
     Non-dict inputs and records without ``attributes`` are returned unchanged.
@@ -66,17 +66,17 @@ class BaseClient:
         page_size: int = 25,
         limit: int = 0,
     ) -> list[dict[str, Any]]:
-        """Fetch all pages of a page-numbered endpoint and flatten JSON:API records.
+        """Fetch all pages of a cursor-paginated endpoint and flatten JSON:API records.
 
         Bitpanda collection responses have shape::
 
             {"data": [{"id": "...", "type": "...", "attributes": {...}}],
-             "meta": {"total_count": N, "page_size": K, "page_number": P},
+             "meta": {"total_count": N, "page_size": K, "next_cursor": "uuid"},
              "links": {...}}
 
-        Pagination advances via the ``page`` query parameter. When a page returns
-        fewer than ``page_size`` items, or when we've accumulated ``total_count``
-        items, we stop.
+        Pagination advances via the ``cursor`` query parameter. Iteration stops when
+        the API returns no ``next_cursor``, an empty page, or fewer items than
+        ``page_size``.
 
         Args:
             path: API path.
@@ -91,10 +91,12 @@ class BaseClient:
         all_items: list[dict[str, Any]] = []
         base_params = dict(params or {})
         base_params["page_size"] = page_size
-        page_number = 1
+        cursor: str | None = None
 
         for _ in range(_MAX_PAGES):
-            request_params = {**base_params, "page": page_number}
+            request_params = {**base_params}
+            if cursor:
+                request_params["cursor"] = cursor
             raw = await self._get(path, request_params)
             page = Page.model_validate(raw)
             all_items.extend(flatten_jsonapi(item) for item in page.data)
@@ -102,15 +104,9 @@ class BaseClient:
             if limit and len(all_items) >= limit:
                 return all_items[:limit]
 
-            # Stop if the page was short (fewer items than requested), or we've
-            # reached total_count, or data came back empty.
-            total = page.meta.total_count
-            if not page.data or len(page.data) < page_size:
+            cursor = page.meta.next_cursor
+            if not cursor or not page.data or len(page.data) < page_size:
                 break
-            if total and len(all_items) >= total:
-                break
-
-            page_number += 1
 
         return all_items
 

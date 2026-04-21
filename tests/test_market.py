@@ -85,4 +85,4 @@ async def test_get_price_validation_error_direct() -> None:
         patch("bitpanda_mcp.tools.market.get_bp_client", return_value=bp),
         pytest.raises(ToolError, match="Unexpected API response"),
     ):
-        await get_price("BTC", ctx)
+        await get_price(ctx, "BTC")

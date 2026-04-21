@@ -5,7 +5,8 @@ from bitpanda_mcp.config import Settings
 
 def test_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BITPANDA_API_KEY", "my-key")
-    s = Settings()
+    monkeypatch.delenv("BITPANDA_BASE_URL", raising=False)
+    s = Settings(_env_file=None)
     assert s.bitpanda_api_key == "my-key"
     assert s.bitpanda_base_url == "https://api.bitpanda.com"
     assert s.request_timeout_s == 30.0
