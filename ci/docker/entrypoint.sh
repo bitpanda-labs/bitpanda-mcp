@@ -1,7 +1,7 @@
 #!/bin/sh
-set -e
+set -eu
 
-if [ "$1" = 'mcp' ]; then
+if [ "${1:-}" = 'mcp' ]; then
     exec bitpanda-mcp
 fi
 
