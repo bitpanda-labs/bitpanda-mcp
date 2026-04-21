@@ -23,8 +23,8 @@ class Trade(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _normalize_fee(cls, data: Any) -> Any:
-        # The /v1/trades API returns fee as a nested JSON:API object
-        # {type: "fee", attributes: {fee_amount: "1.49", ...}} — extract the amount.
+        # /v1/trades returns fee as a nested JSON:API object
+        # {type: "fee", attributes: {fee_amount: ...}}; flatten to the amount string.
         if isinstance(data, dict) and isinstance(data.get("fee"), dict):
             fee_attrs = data["fee"].get("attributes", {})
             data = {**data, "fee": str(fee_attrs.get("fee_amount", "0"))}

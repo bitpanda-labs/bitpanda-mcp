@@ -19,8 +19,8 @@ class BitpandaClient(BaseClient):
     async def list_wallets(self) -> list[Wallet]:
         """Fetch all crypto wallets.
 
-        ``/v1/wallets`` returns a flat ``{data: [...], last_user_action: {...}}`` envelope
-        (no pagination) on the Bitpanda Public API.
+        ``/v1/wallets`` returns a flat ``{data: [...], last_user_action: {...}}``
+        envelope (no pagination).
         """
         raw = await self._get("/v1/wallets")
         items = raw.get("data", []) if isinstance(raw, dict) else []
@@ -84,7 +84,7 @@ class BitpandaClient(BaseClient):
         """Fetch the public ticker.
 
         Response is a flat dict: ``{symbol: {currency: price, ...}, ...}``.
-        We pick the EUR price as the canonical ``price_eur``.
+        Only symbols that quote EUR are kept.
         """
         raw = await self._get("/v1/ticker")
         if not isinstance(raw, dict):

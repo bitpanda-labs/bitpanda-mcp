@@ -14,8 +14,7 @@ async def list_trades(
 ) -> dict:
     """List your buy/sell trades on Bitpanda.
 
-    Optional filter: trade_type (buy/sell).
-    Uses the dedicated /trades endpoint.
+    Optional filter: ``trade_type`` (buy/sell).
     """
     try:
         trades = await get_bp_client(ctx).list_trades(trade_type=trade_type, page_size=page_size, limit=limit)

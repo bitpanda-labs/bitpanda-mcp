@@ -41,7 +41,7 @@ class BaseClient:
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Perform an authenticated GET request and return parsed JSON.
 
-        Raises ``BitpandaAPIError`` on non-2xx/3xx responses, network errors,
+        Raises ``BitpandaAPIError`` on 4xx/5xx responses, network errors,
         and non-JSON responses (e.g. HTML proxy pages).
         """
         try:
@@ -74,9 +74,9 @@ class BaseClient:
              "meta": {"total_count": N, "page_size": K, "next_cursor": "uuid"},
              "links": {...}}
 
-        Pagination advances via the ``cursor`` query parameter. Iteration stops when
-        the API returns no ``next_cursor``, an empty page, or fewer items than
-        ``page_size``.
+        Pagination advances via the ``cursor`` query parameter. Iteration
+        stops on any of: reaching ``limit``, missing ``next_cursor``, an
+        empty page, a short page, or the internal ``_MAX_PAGES`` safety cap.
 
         Args:
             path: API path.

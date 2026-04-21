@@ -24,7 +24,6 @@ uv build                       # build wheel + sdist into dist/
 - `src/bitpanda_mcp/clients/` — async httpx clients, `get_bp_client()` for dual stdio/HTTP mode
 - `src/bitpanda_mcp/tools/` — MCP tool functions (all read-only)
 - `src/bitpanda_mcp/models/` — Pydantic models for API responses
-- `src/bitpanda_mcp/resources/` — MCP resources
 - `src/bitpanda_mcp/prompts/` — MCP prompt templates
 - `ci/docker/` — multi-stage Dockerfile, entrypoint script
 - `.github/workflows/` — CI (lint, test on 3.11–3.14, security audit, build) and publish (PyPI on release)
@@ -70,7 +69,7 @@ Rules:
 
 - `_get()` in `clients/base.py` catches `httpx.HTTPError` (network) and `ValueError` (non-JSON responses)
 - All tool functions catch both `BitpandaAPIError` and `pydantic.ValidationError`
-- Tools convert errors to `ToolError`; resources convert to `ResourceError`
+- Tools convert errors to `ToolError`
 - Never expose raw tracebacks to MCP clients
 - Structured logging via stdlib `logging` with PII filtering (API keys, Bearer tokens redacted)
 - JSON log output in HTTP mode (CloudWatch-compatible), console output in stdio mode
@@ -81,7 +80,7 @@ Rules:
 - Line length: 110
 - Use `ToolError` for tool errors, never return error dicts
 - Use `ToolAnnotations(readOnlyHint=True, openWorldHint=True)` for all Bitpanda tools
-- Tag tools by category: `portfolio`, `market-data`, `assets`, `wallets`, `transactions`, `trades`
+- Tag tools by category: `portfolio`, `market-data`, `wallets`, `transactions`, `trades`
 - Models use `ConfigDict(extra="ignore")` to tolerate extra API fields
 
 ## Testing
