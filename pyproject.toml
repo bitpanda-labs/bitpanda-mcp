@@ -12,8 +12,8 @@ dependencies = [
     "authlib>=1.6.11",
     "fastmcp>=3.2",
     "httpx>=0.28",
-    "pydantic>=2.0",
-    "pydantic-settings>=2.0",
+    "pydantic>=2.13.3",
+    "pydantic-settings>=2.14.0",
 ]
 
 [project.scripts]
