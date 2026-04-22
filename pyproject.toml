@@ -1,28 +1,93 @@
-[tool.poetry]
-name = "bitpanda-mcp-server"
+[project]
+name = "bitpanda-mcp"
 version = "0.1.0"
-description = "Bitpanda Public API → MCP server (via fastapi_mcp)"
-authors = ["Bitpanda <dev@bitpanda.com>"]
+description = "MCP server for Bitpanda — portfolio, wallets, trading, market data"
 readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    { name = "Bitpanda", email = "tech@bitpanda.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "authlib>=1.6.11",
+    "fastmcp>=3.2",
+    "httpx>=0.28",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
 
-[tool.poetry.dependencies]
-python = "~3.11.0"
+[project.scripts]
+bitpanda-mcp = "bitpanda_mcp.server:main"
 
-fastmcp = "^2.0.0"
-fastapi = "^0.123.0"
-python-dotenv = "^1.1.0"
-python-json-logger = "^3.3.0"
-urllib3 = ">=2.5.0" # vuln fix
-uvicorn = "^0.38.0"
+[project.urls]
+Homepage = "https://github.com/bitpanda-labs/bitpanda-mcp"
+Repository = "https://github.com/bitpanda-labs/bitpanda-mcp"
+Issues = "https://github.com/bitpanda-labs/bitpanda-mcp/issues"
 
-[tool.poetry.group.dev.dependencies]
-mypy = "1.19.0"
-pre-commit = "4.1.0"
-pytest = "8.3.4"
-pytest-cov = "6.0.0"
-ruff = "0.14.7"
-pytest-vcr = "^1.0.2"
+[dependency-groups]
+dev = [
+    "pip-audit>=2.7",
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=7.0",
+    "respx>=0.23",
+    "ruff>=0.15",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+extend-select = [
+    "ASYNC", # flake8-async
+    "S",     # flake8-bandit
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "C4",    # flake8-comprehensions
+    "ERA",   # flake8-eradicate
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "PT",    # flake8-pytest-style
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "TID",   # flake8-tidy-imports
+    "I",     # isort
+    "C90",   # mccabe
+    "N",     # pep8-naming
+    "PGH",   # pygrep
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "D",     # pydocstyle
+    "UP",    # pyupgrade
+    "PL",    # pylint
+    "RUF",   # ruff checks
+]
+ignore = [
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",
+    "D203", "D213",
+]
+
+[tool.ruff.lint.pylint]
+max-args = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "PLR2004", "D"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+xfail_strict = true
+addopts = "--strict-markers --cov=src/bitpanda_mcp --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true
+source = ["src/bitpanda_mcp"]
+
+[tool.coverage.report]
+skip_covered = true
+fail_under = 100
+exclude_also = ["if TYPE_CHECKING:", "if __name__", "def main", "except PackageNotFoundError"]

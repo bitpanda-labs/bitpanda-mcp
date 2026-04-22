@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.6"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --python ${{ matrix.python-version }}
+
+      - name: Test
+        run: uv run pytest --cov-report=xml --junitxml=xunit-reports/junit-report.xml
+        env:
+          BITPANDA_API_KEY: test-key
+
+      - name: Prune cache
+        run: uv cache prune --ci
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.6"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Format check
+        run: uv run ruff format --check src/ tests/
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.6"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Security audit
+        run: uv run pip-audit
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.6"
+          enable-cache: true
+
+      - name: Build package
+        run: uv build
+
+      - name: Verify wheel install
+        run: |
+          uv venv /tmp/pkg-test --python 3.14 --seed
+          /tmp/pkg-test/bin/pip install dist/*.whl
+          /tmp/pkg-test/bin/python -c "from bitpanda_mcp import __version__; assert __version__"
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

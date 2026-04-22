@@ -6,54 +6,11 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
-      
-  - repo: https://github.com/wemake-services/dotenv-linter
-    rev: 0.2.0
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
     hooks:
-      - id: dotenv-linter
-        files: ^\.env(\.?.*)$
-        
-  - repo: local
-    hooks:
-      # https://github.com/astral-sh/ruff-pre-commit/blob/main/.pre-commit-hooks.yaml
+      - id: ruff
+        args: [--fix]
       - id: ruff-format
-        name: ruff-format
-        alias: format
-        description: "Run 'ruff format' for extremely fast Python formatting"
-        entry: bash -c 'if [ -n "${CI}" ]; then ruff format --force-exclude "$@"; else poetry run ruff format --force-exclude "$@"; fi' dummy-first-arg
-        language: python
-        types_or: [python, pyi]
-        args: []
-        require_serial: true
-        additional_dependencies: []
-        minimum_pre_commit_version: "2.9.2"
-
-      - id: ruff-lint
-        name: ruff-lint
-        alias: lint
-        description: "Run 'ruff' for extremely fast Python linting"
-        entry: bash -c 'if [ -n "${CI}" ]; then ruff check --force-exclude "$@"; else poetry run ruff check --force-exclude "$@"; fi' dummy-first-arg
-        language: python
-        types_or: [python, pyi]
-        args: []
-        require_serial: true
-        additional_dependencies: []
-        minimum_pre_commit_version: "2.9.2"
-
-      # https://github.com/python-poetry/poetry
-      - id: poetry-check
-        alias: lint
-        name: poetry-check
-        description: run poetry check to validate config
-        entry: poetry check
-        language: python
-        pass_filenames: false
-        files: ^(.*/)?pyproject\.toml$
-
-      - id: mypy
-        alias: lint
-        name: mypy
-        entry: bash -c 'if [ -n "${CI}" ]; then mypy "$@"; else poetry run mypy "$@"; fi' dummy-first-arg
-        language: system
-        types: [python]
-        require_serial: true

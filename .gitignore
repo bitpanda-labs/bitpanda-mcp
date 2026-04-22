@@ -1,92 +1,61 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
+build/
+dist/
+wheels/
+sdist/
+.eggs/
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Environments
-.env
+# Virtual environments
 .venv
 env/
 venv/
-ENV/
 
-# mypy
+# uv
+.uv/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage-reports/
+htmlcov/
+xunit-reports/
+.hypothesis/
+
+# Type checking
 .mypy_cache/
 .dmypy.json
-dmypy.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDEs
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
 
 # macOS
 .DS_Store
 
-# Temporary files
-*.tmp
-*.temp
-*.swp
-*.swo
-
 # Logs
 *.log
-logs/
 
-# FastAPI specific
-.pytest_cache/
-
-# Local development
-.env.local
-.env.development
-.env.test
-.env.production
-
-# IDEs
-.cursor
-.claude
-.vscode
+# Pre-commit
+.cache/
 
 # MCP
 .mcp.json
+
+# Ruff
+.ruff_cache/

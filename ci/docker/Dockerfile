@@ -1,41 +1,51 @@
-FROM public.ecr.aws/docker/library/python:3.11-slim-trixie
+# --- builder ---
+FROM python:3.14-slim AS builder
 
-ARG USER_NAME="bp_mcp"
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /usr/local/bin/
+
+WORKDIR /app
+
+ENV UV_PROJECT_ENVIRONMENT=/usr/src/app/.venv
+
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY src/ src/
+COPY README.md LICENSE ./
+RUN uv sync --frozen --no-dev --no-editable
+
+# --- runtime ---
+FROM python:3.14-slim
+
+LABEL org.opencontainers.image.title="bitpanda-mcp" \
+      org.opencontainers.image.description="MCP server for Bitpanda" \
+      org.opencontainers.image.source="https://github.com/bitpanda-labs/bitpanda-mcp" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+ARG USER_NAME="bitpanda_mcp"
 ARG USER_HOME="/usr/src/app"
 ARG USER_ID=1000
 
-ENV PYTHONUNBUFFERED=1 \
-    POETRY_VIRTUALENVS_CREATE=1 \
-    POETRY_VIRTUALENVS_IN_PROJECT=1 \
-    POETRY_INSTALLER_MODERN_INSTALLATION=0 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_NO_ANSI=1 \
-    POETRY_HOME=/opt/poetry
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl vim git wait-for-it && \
-    apt-get upgrade -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR ${USER_HOME}
 
 RUN groupadd -g ${USER_ID} ${USER_NAME} && \
     useradd -l -u ${USER_ID} -g ${USER_ID} --create-home --home-dir ${USER_HOME} --shell /bin/bash ${USER_NAME}
 
-COPY --chown=${USER_NAME}:${USER_NAME} poetry.lock pyproject.toml *.whl ./
+COPY --from=builder --chown=${USER_NAME}:${USER_NAME} /usr/src/app/.venv ${USER_HOME}/.venv
+COPY --chown=${USER_NAME}:${USER_NAME} ci/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-RUN pip install poetry==1.8.4 \
-    && poetry install --no-interaction --no-ansi --no-root
-
-ENV PATH ${USER_HOME}/.venv/bin:${PATH}
-
-COPY --chown=${USER_NAME}:${USER_NAME} . ./
+ENV PATH="${USER_HOME}/.venv/bin:${PATH}"
+ENV FASTMCP_TRANSPORT=streamable-http
+ENV FASTMCP_HOST=0.0.0.0
+ENV FASTMCP_PORT=8000
+ENV FASTMCP_STATELESS_HTTP=true
 
 EXPOSE 8000
 
 USER ${USER_NAME}
 
-# Run the application
-ENTRYPOINT [ "ci/docker/entrypoint.sh" ]
-CMD ["api"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["mcp"]
