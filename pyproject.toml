@@ -31,11 +31,11 @@ dev = [
     "pytest-asyncio>=1.0",
     "pytest-cov>=7.0",
     "respx>=0.23",
-    "ruff>=0.15",
+    "ruff>=0.15.11",
 ]
 
 [build-system]
-requires = ["hatchling>=1.21"]
+requires = ["hatchling>=1.29.0"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
