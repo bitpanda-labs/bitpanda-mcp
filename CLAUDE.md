@@ -83,6 +83,17 @@ Rules:
 - Tag tools by category: `portfolio`, `market-data`, `wallets`, `transactions`, `trades`
 - Models use `ConfigDict(extra="ignore")` to tolerate extra API fields
 
+## Comments
+
+**Absolute minimum. Default is no comment.**
+
+- Never add a comment unless the WHY is completely non-obvious and cannot be expressed through naming alone
+- Never describe what the code does — well-named identifiers already do that
+- Never reference other repositories, internal systems, infrastructure, deployment targets, or external tooling in any comment, docstring, commit message, or field description — **not even indirectly**
+- Never cross-reference other repos (internal or external) anywhere in source code, comments, or commit messages
+- No multi-line comment blocks. One short line maximum, only when truly unavoidable
+- When in doubt: delete the comment
+
 ## Testing
 
 - pytest + respx for HTTP mocking, FastMCP `Client` for end-to-end tool tests

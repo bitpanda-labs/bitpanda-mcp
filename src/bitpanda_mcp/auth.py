@@ -5,6 +5,7 @@ non-empty token and makes it available to tools via ``get_access_token()``.
 """
 
 from fastmcp.server.auth import AccessToken, TokenVerifier
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class BearerKeyVerifier(TokenVerifier):
@@ -18,3 +19,23 @@ class BearerKeyVerifier(TokenVerifier):
         if not token:
             return None
         return AccessToken(token=token, client_id="bearer", scopes=[])
+
+
+class ApiKeyHeaderMiddleware:
+    def __init__(self, app: ASGIApp, header_name: str) -> None:
+        normalized = header_name.strip().lower()
+        if not normalized:
+            raise ValueError("header_name must not be empty or whitespace")
+        self.app = app
+        self.header = normalized.encode()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            headers = scope["headers"]
+            key_value = next((v for k, v in headers if k == self.header), None)
+            if key_value is not None:
+                stripped = [(k, v) for k, v in headers if k != self.header]
+                if not any(k == b"authorization" for k, _ in stripped):
+                    stripped = [*stripped, (b"authorization", b"Bearer " + key_value)]
+                scope = {**scope, "headers": stripped}
+        await self.app(scope, receive, send)
