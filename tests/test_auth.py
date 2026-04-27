@@ -1,6 +1,8 @@
 from collections.abc import MutableMapping
 from typing import Any
 
+import pytest
+
 from bitpanda_mcp.auth import ApiKeyHeaderMiddleware, BearerKeyVerifier
 
 SAMPLE_KEY = "my-api-key-123"
@@ -60,6 +62,23 @@ async def test_middleware_does_not_overwrite_existing_authorization() -> None:
     )
 
     assert captured["headers"][b"authorization"] == b"Bearer already-set"
+    assert b"x-api-key" not in captured["headers"]
+
+
+def test_middleware_rejects_empty_header_name() -> None:
+    async def app(scope: Any, receive: Any, send: Any) -> None:
+        pass
+
+    with pytest.raises(ValueError, match="header_name"):
+        ApiKeyHeaderMiddleware(app, header_name="   ")
+
+
+def test_middleware_strips_whitespace_from_header_name() -> None:
+    async def app(scope: Any, receive: Any, send: Any) -> None:
+        pass
+
+    mw = ApiKeyHeaderMiddleware(app, header_name="  X-Api-Key  ")
+    assert mw.header == b"x-api-key"
 
 
 async def test_middleware_passthrough_when_custom_header_absent() -> None:
