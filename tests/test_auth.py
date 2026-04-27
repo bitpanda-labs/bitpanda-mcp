@@ -38,6 +38,7 @@ async def test_middleware_injects_authorization_from_custom_header() -> None:
     await mw(_make_scope([(b"x-api-key", b"secret-key")]), None, None)
 
     assert captured["headers"][b"authorization"] == b"Bearer secret-key"
+    assert b"x-api-key" not in captured["headers"]
 
 
 async def test_middleware_does_not_overwrite_existing_authorization() -> None:

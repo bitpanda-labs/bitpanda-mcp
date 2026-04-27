@@ -31,5 +31,6 @@ class ApiKeyHeaderMiddleware:
             headers = scope["headers"]
             key_value = next((v for k, v in headers if k == self.header), None)
             if key_value is not None and not any(k == b"authorization" for k, _ in headers):
-                scope = {**scope, "headers": [*headers, (b"authorization", b"Bearer " + key_value)]}
+                stripped = [(k, v) for k, v in headers if k != self.header]
+                scope = {**scope, "headers": [*stripped, (b"authorization", b"Bearer " + key_value)]}
         await self.app(scope, receive, send)
