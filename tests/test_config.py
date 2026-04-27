@@ -32,3 +32,15 @@ def test_settings_transport_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings(_env_file=None)
     assert s.server_transport == "streamable-http"
     assert s.bitpanda_api_key is None
+
+
+def test_settings_mcp_auth_header_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_AUTH_HEADER", "X-Api-Key")
+    s = Settings(_env_file=None)
+    assert s.mcp_auth_header == "X-Api-Key"
+
+
+def test_settings_mcp_auth_header_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MCP_AUTH_HEADER", raising=False)
+    s = Settings(_env_file=None)
+    assert s.mcp_auth_header is None

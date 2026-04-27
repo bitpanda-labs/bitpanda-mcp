@@ -6,11 +6,12 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from bitpanda_mcp import __version__
-from bitpanda_mcp.auth import BearerKeyVerifier
+from bitpanda_mcp.auth import ApiKeyHeaderMiddleware, BearerKeyVerifier
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.config import Settings
 from bitpanda_mcp.logging import configure_logging
@@ -99,10 +100,40 @@ async def health(_request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+# --- OAuth discovery endpoints ---
+@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
+async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
+    base = str(request.base_url).rstrip("/")
+    return JSONResponse(
+        {
+            "issuer": base,
+            "response_types_supported": [],
+            "grant_types_supported": [],
+            "token_endpoint_auth_methods_supported": ["none"],
+        }
+    )
+
+
+@mcp.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
+async def oauth_protected_resource_metadata(request: Request) -> JSONResponse:
+    base = str(request.base_url).rstrip("/")
+    return JSONResponse(
+        {
+            "resource": f"{base}/mcp",
+            "authorization_servers": [base],
+            "bearer_methods_supported": ["header"],
+        }
+    )
+
+
 def main() -> None:
     """Entry point for `bitpanda-mcp` console script."""
-    configure_logging(json_output=Settings().server_transport != "stdio")
-    mcp.run()
+    settings = Settings()
+    configure_logging(json_output=settings.server_transport != "stdio")
+    if settings.mcp_auth_header:
+        mcp.run(middleware=[Middleware(ApiKeyHeaderMiddleware, header_name=settings.mcp_auth_header)])
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":

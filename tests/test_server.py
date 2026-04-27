@@ -3,9 +3,11 @@
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from starlette.middleware import Middleware
 from starlette.testclient import TestClient
 
 from bitpanda_mcp import __version__
+from bitpanda_mcp.auth import ApiKeyHeaderMiddleware
 from bitpanda_mcp.config import Settings
 from bitpanda_mcp.server import lifespan, mcp
 
@@ -25,6 +27,32 @@ def test_health_endpoint() -> None:
     resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_oauth_authorization_server_metadata() -> None:
+    app = mcp.http_app()
+    client = TestClient(app, base_url="http://testserver")
+    resp = client.get("/.well-known/oauth-authorization-server")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["issuer"] == "http://testserver"
+    assert data["grant_types_supported"] == []
+
+
+def test_oauth_protected_resource_metadata() -> None:
+    app = mcp.http_app()
+    client = TestClient(app, base_url="http://testserver")
+    resp = client.get("/.well-known/oauth-protected-resource")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["resource"] == "http://testserver/mcp"
+    assert data["bearer_methods_supported"] == ["header"]
+
+
+def test_http_app_accepts_api_key_middleware() -> None:
+    app = mcp.http_app(middleware=[Middleware(ApiKeyHeaderMiddleware, header_name="X-Api-Key")])
+    client = TestClient(app)
+    assert client.get("/healthz").status_code == 200
 
 
 async def test_lifespan_with_api_key() -> None:

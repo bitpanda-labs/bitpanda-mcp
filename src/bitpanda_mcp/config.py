@@ -20,3 +20,5 @@ class Settings(BaseSettings):
         alias="FASTMCP_TRANSPORT",
         description="Transport mode read from FastMCP env var.",
     )
+
+    mcp_auth_header: str | None = Field(default=None, alias="MCP_AUTH_HEADER")
