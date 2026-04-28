@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
+import uvicorn
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp
 
 from bitpanda_mcp import __version__
 from bitpanda_mcp.auth import ApiKeyHeaderMiddleware, BearerKeyVerifier
@@ -100,40 +101,27 @@ async def health(_request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
-# --- OAuth discovery endpoints ---
-@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
-async def oauth_authorization_server_metadata(request: Request) -> JSONResponse:
-    base = str(request.base_url).rstrip("/")
-    return JSONResponse(
-        {
-            "issuer": base,
-            "response_types_supported": [],
-            "grant_types_supported": [],
-            "token_endpoint_auth_methods_supported": ["none"],
-        }
-    )
-
-
-@mcp.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
-async def oauth_protected_resource_metadata(request: Request) -> JSONResponse:
-    base = str(request.base_url).rstrip("/")
-    return JSONResponse(
-        {
-            "resource": f"{base}/mcp",
-            "authorization_servers": [base],
-            "bearer_methods_supported": ["header"],
-        }
-    )
+def build_http_app(settings: Settings) -> ASGIApp:
+    app: ASGIApp = mcp.http_app()
+    if settings.mcp_auth_header:
+        app = ApiKeyHeaderMiddleware(app, header_name=settings.mcp_auth_header)
+    return app
 
 
 def main() -> None:
     """Entry point for `bitpanda-mcp` console script."""
     settings = Settings()
     configure_logging(json_output=settings.server_transport != "stdio")
-    if settings.mcp_auth_header:
-        mcp.run(middleware=[Middleware(ApiKeyHeaderMiddleware, header_name=settings.mcp_auth_header)])
-    else:
+    if settings.server_transport == "stdio":
         mcp.run()
+        return
+
+    uvicorn.run(
+        build_http_app(settings),
+        host=settings.server_host,
+        port=settings.server_port,
+        log_config=None,
+    )
 
 
 if __name__ == "__main__":

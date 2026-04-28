@@ -1,15 +1,12 @@
-"""Tests for server.py — health endpoint, version, and lifespan."""
-
 from unittest.mock import AsyncMock, patch
 
 import httpx
-from starlette.middleware import Middleware
 from starlette.testclient import TestClient
 
 from bitpanda_mcp import __version__
 from bitpanda_mcp.auth import ApiKeyHeaderMiddleware
 from bitpanda_mcp.config import Settings
-from bitpanda_mcp.server import lifespan, mcp
+from bitpanda_mcp.server import build_http_app, lifespan, mcp
 
 
 def test_version_is_set() -> None:
@@ -29,30 +26,64 @@ def test_health_endpoint() -> None:
     assert resp.json() == {"status": "ok"}
 
 
-def test_oauth_authorization_server_metadata() -> None:
+def test_oauth_well_known_routes_are_not_published() -> None:
     app = mcp.http_app()
-    client = TestClient(app, base_url="http://testserver")
-    resp = client.get("/.well-known/oauth-authorization-server")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["issuer"] == "http://testserver"
-    assert data["grant_types_supported"] == []
-
-
-def test_oauth_protected_resource_metadata() -> None:
-    app = mcp.http_app()
-    client = TestClient(app, base_url="http://testserver")
-    resp = client.get("/.well-known/oauth-protected-resource")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["resource"] == "http://testserver/mcp"
-    assert data["bearer_methods_supported"] == ["header"]
-
-
-def test_http_app_accepts_api_key_middleware() -> None:
-    app = mcp.http_app(middleware=[Middleware(ApiKeyHeaderMiddleware, header_name="X-Api-Key")])
     client = TestClient(app)
-    assert client.get("/healthz").status_code == 200
+    assert client.get("/.well-known/oauth-authorization-server").status_code == 404
+    assert client.get("/.well-known/oauth-protected-resource").status_code == 404
+
+
+def _initialize_request() -> dict:
+    return {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "t", "version": "0"},
+        },
+        "id": 1,
+    }
+
+
+def _mcp_headers(extra: dict[str, str]) -> dict[str, str]:
+    return {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        **extra,
+    }
+
+
+def test_build_http_app_without_auth_header_does_not_wrap() -> None:
+    settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http")
+    app = build_http_app(settings)
+    assert not isinstance(app, ApiKeyHeaderMiddleware)
+
+
+def test_build_http_app_with_auth_header_wraps_with_middleware() -> None:
+    settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http", MCP_AUTH_HEADER="X-Api-Key")
+    app = build_http_app(settings)
+    assert isinstance(app, ApiKeyHeaderMiddleware)
+
+
+def test_build_http_app_rewrites_x_api_key_to_bearer() -> None:
+    settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http", MCP_AUTH_HEADER="X-Api-Key")
+    app = build_http_app(settings)
+    with TestClient(app) as client:
+        resp = client.post(
+            "/mcp",
+            headers=_mcp_headers({"X-Api-Key": "test-token-123"}),
+            json=_initialize_request(),
+        )
+        assert resp.status_code == 200
+
+
+def test_build_http_app_rejects_request_without_credentials_when_header_set() -> None:
+    settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http", MCP_AUTH_HEADER="X-Api-Key")
+    app = build_http_app(settings)
+    with TestClient(app) as client:
+        resp = client.post("/mcp", headers=_mcp_headers({}), json=_initialize_request())
+        assert resp.status_code == 401
 
 
 async def test_lifespan_with_api_key() -> None:
