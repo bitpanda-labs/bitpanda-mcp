@@ -20,5 +20,7 @@ class Settings(BaseSettings):
         alias="FASTMCP_TRANSPORT",
         description="Transport mode read from FastMCP env var.",
     )
+    server_host: str = Field(default="127.0.0.1", alias="FASTMCP_HOST")
+    server_port: int = Field(default=8000, alias="FASTMCP_PORT", ge=1, le=65535)
 
     mcp_auth_header: str | None = Field(default=None, alias="MCP_AUTH_HEADER")
