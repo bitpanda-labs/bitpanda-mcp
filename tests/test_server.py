@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 from starlette.testclient import TestClient
 
 from bitpanda_mcp import __version__
@@ -54,7 +55,8 @@ def _mcp_headers(extra: dict[str, str]) -> dict[str, str]:
     }
 
 
-def test_build_http_app_without_auth_header_does_not_wrap() -> None:
+def test_build_http_app_without_auth_header_does_not_wrap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MCP_AUTH_HEADER", raising=False)
     settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http")
     app = build_http_app(settings)
     assert not isinstance(app, ApiKeyHeaderMiddleware)
