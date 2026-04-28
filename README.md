@@ -101,7 +101,7 @@ docker run -p 8000:8000 bitpanda-mcp
     "bitpanda": {
       "url": "http://localhost:8000/mcp",
       "headers": {
-        "Authorization": "Bearer YOUR_BITPANDA_API_KEY"
+        "X-Api-Key": "YOUR_BITPANDA_API_KEY"
       }
     }
   }
