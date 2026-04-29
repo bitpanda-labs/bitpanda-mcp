@@ -89,7 +89,9 @@ def test_build_http_app_rejects_request_without_credentials_when_header_set() ->
 
 
 async def test_lifespan_with_api_key() -> None:
-    settings = Settings(bitpanda_api_key="test-key-123", _env_file=None)
+    settings = Settings(
+        bitpanda_api_key="test-key-123", _env_file=None, FASTMCP_TRANSPORT="stdio"
+    )
     with patch("bitpanda_mcp.server.Settings", return_value=settings):
         mock_server = AsyncMock()
         async with lifespan(mock_server) as ctx:
@@ -99,7 +101,7 @@ async def test_lifespan_with_api_key() -> None:
 
 
 async def test_lifespan_without_api_key() -> None:
-    settings = Settings(bitpanda_api_key=None, _env_file=None)
+    settings = Settings(bitpanda_api_key=None, _env_file=None, FASTMCP_TRANSPORT="stdio")
     with patch("bitpanda_mcp.server.Settings", return_value=settings):
         mock_server = AsyncMock()
         async with lifespan(mock_server) as ctx:
