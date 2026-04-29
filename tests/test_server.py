@@ -105,3 +105,16 @@ async def test_lifespan_without_api_key() -> None:
         async with lifespan(mock_server) as ctx:
             assert "http" in ctx
             assert "bp" not in ctx
+
+
+async def test_lifespan_http_mode_ignores_env_api_key() -> None:
+    settings = Settings(
+        bitpanda_api_key="env-admin-key",
+        _env_file=None,
+        FASTMCP_TRANSPORT="streamable-http",
+    )
+    with patch("bitpanda_mcp.server.Settings", return_value=settings):
+        mock_server = AsyncMock()
+        async with lifespan(mock_server) as ctx:
+            assert "http" in ctx
+            assert "bp" not in ctx
