@@ -53,9 +53,13 @@ def register(server: FastMCP) -> None:
 async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     """Create shared API clients for the server lifetime.
 
-    - **stdio mode** (``BITPANDA_API_KEY`` set): yields a pre-built ``BitpandaClient`` under ``"bp"``.
-    - **HTTP mode** (no env key): yields only the shared ``httpx.AsyncClient`` under ``"http"``;
-      per-request clients are built from the caller's Bearer token in ``get_bp_client()``.
+    - **stdio mode**: yields a pre-built ``BitpandaClient`` under ``"bp"`` when
+      ``BITPANDA_API_KEY`` is set in the environment.
+    - **HTTP mode**: yields only the shared ``httpx.AsyncClient`` under ``"http"``;
+      per-request clients are built from the caller's Bearer token in
+      ``get_bp_client()``. ``BITPANDA_API_KEY`` is ignored in HTTP mode so a
+      multi-tenant deployment cannot accidentally route every request through a
+      single operator key.
     """
     settings = Settings()
     log = logging.getLogger(__name__)
@@ -68,7 +72,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     ) as bp_http:
         ctx: dict[str, Any] = {"http": bp_http}
 
-        if settings.bitpanda_api_key:
+        if settings.server_transport == "stdio" and settings.bitpanda_api_key:
             ctx["bp"] = BitpandaClient(bp_http, settings.bitpanda_api_key)
 
         yield ctx
