@@ -29,17 +29,29 @@ async def get_price(ctx: Context, symbol: str) -> dict:
         raise ToolError(f"Unexpected API response: {e}") from e
 
 
-async def list_prices(ctx: Context, all_assets: bool = False, all: bool = False) -> dict:  # noqa: A002
-    """List prices for held assets, or every ticker asset when ``all_assets``/``all`` is true."""
+async def list_prices(
+    ctx: Context,
+    all_assets: bool = False,
+    all: bool = False,  # noqa: A002
+    limit: int = 100,
+) -> dict:
+    """List ticker prices.
+
+    By default, returns held assets that have ticker data. Set ``all_assets``/``all``
+    to include the market-wide ticker list. ``limit`` caps returned rows; use
+    ``limit=0`` for no cap.
+    """
     try:
         client = get_bp_client(ctx)
         ticker = await client.fetch_ticker()
 
         entries = ticker.entries
+        skipped_asset_ids: list[str] = []
         if not (all_assets or all):
             wallets = await client.list_wallets(page_size=100)
             held_asset_ids = {wallet.asset_id for wallet in wallets if wallet.balance_float > 0}
             entries = [entry for entry in entries if entry.id in held_asset_ids]
+            skipped_asset_ids = sorted(held_asset_ids - {entry.id for entry in entries})
 
         prices = [
             {
@@ -55,7 +67,14 @@ async def list_prices(ctx: Context, all_assets: bool = False, all: bool = False)
             for entry in entries
         ]
         prices.sort(key=lambda item: item["symbol"])
-        return {"count": len(prices), "prices": prices}
+        total_available = len(prices)
+        if limit > 0:
+            prices = prices[:limit]
+
+        result: dict = {"count": len(prices), "total_available": total_available, "prices": prices}
+        if skipped_asset_ids:
+            result["skipped_asset_ids"] = skipped_asset_ids
+        return result
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
     except ValidationError as e:

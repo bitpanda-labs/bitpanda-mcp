@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     bitpanda_api_key: str | None = Field(
         default=None,
-        description="Bitpanda API key. Required for stdio; in HTTP mode sent per-request as Bearer token.",
+        description="Bitpanda API key. Required for stdio; in HTTP mode sent per-request via X-Api-Key.",
     )
     bitpanda_base_url: str = Field(default="https://developer.bitpanda.com")
 
@@ -23,4 +23,4 @@ class Settings(BaseSettings):
     server_host: str = Field(default="127.0.0.1", alias="FASTMCP_HOST")
     server_port: int = Field(default=8000, alias="FASTMCP_PORT", ge=1, le=65535)
 
-    mcp_auth_header: str | None = Field(default=None, alias="MCP_AUTH_HEADER")
+    mcp_auth_header: str = Field(default="X-Api-Key", alias="MCP_AUTH_HEADER")

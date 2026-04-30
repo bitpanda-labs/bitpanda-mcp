@@ -43,4 +43,4 @@ def test_settings_mcp_auth_header_from_env(monkeypatch: pytest.MonkeyPatch) -> N
 def test_settings_mcp_auth_header_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MCP_AUTH_HEADER", raising=False)
     s = Settings(_env_file=None)
-    assert s.mcp_auth_header is None
+    assert s.mcp_auth_header == "X-Api-Key"

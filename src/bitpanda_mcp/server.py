@@ -57,7 +57,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     - **stdio mode**: yields a pre-built ``BitpandaClient`` under ``"bp"`` when
       ``BITPANDA_API_KEY`` is set in the environment.
     - **HTTP mode**: yields only the shared ``httpx.AsyncClient`` under ``"http"``;
-      per-request clients are built from the caller's Bearer token in
+      per-request clients are built from the caller's ``X-Api-Key`` header in
       ``get_bp_client()``. ``BITPANDA_API_KEY`` is ignored in HTTP mode so a
       multi-tenant deployment cannot accidentally route every request through a
       single operator key.
@@ -87,10 +87,11 @@ mcp = FastMCP(
     instructions=(
         "MCP server for Bitpanda. Use get_portfolio for a full overview of holdings with EUR values. "
         "Use get_price to check a specific asset price by symbol (e.g. BTC, ETH). "
-        "Use list_prices to list prices for held assets or all ticker assets. "
-        "Use list_trades to see recent buy/sell activity. "
+        "Use list_prices for held-asset ticker prices or a capped market-wide ticker list. "
+        "Use list_trades for normalized buy/sell activity. "
         "Use list_wallets to see asset balances. "
-        "Use list_transactions for detailed transaction history. "
+        "Use list_transactions for raw transaction history, including deposits, withdrawals, "
+        "transfers, and trades. "
         "Use get_asset for asset metadata. "
         "All data comes from the Bitpanda API and requires a valid API key."
     ),
@@ -110,9 +111,7 @@ async def health(_request: Request) -> JSONResponse:
 
 def build_http_app(settings: Settings) -> ASGIApp:
     app: ASGIApp = mcp.http_app()
-    if settings.mcp_auth_header:
-        app = ApiKeyHeaderMiddleware(app, header_name=settings.mcp_auth_header)
-    return app
+    return ApiKeyHeaderMiddleware(app, header_name=settings.mcp_auth_header)
 
 
 def main() -> None:

@@ -84,44 +84,47 @@ class BitpandaClient(BaseClient):
         limit: int = 0,
     ) -> list[Trade]:
         """Fetch buy and sell trades."""
-        fetch_limit = limit * 10 if asset_type and limit else limit
-        transactions = await self.list_transactions(
-            from_including=from_including,
-            to_excluding=to_excluding,
-            page_size=page_size,
-            limit=fetch_limit,
-        )
-        trade_transactions = [
-            tx for tx in transactions if tx.is_trade and (not trade_type or tx.operation_type == trade_type)
-        ]
-        if not trade_transactions:
-            return []
+        params: dict[str, Any] = {}
+        if from_including:
+            params["from_including"] = from_including
+        if to_excluding:
+            params["to_excluding"] = to_excluding
 
-        ticker = await self.fetch_ticker()
-
+        ticker: Ticker | None = None
         trades: list[Trade] = []
-        for tx in trade_transactions:
-            ticker_entry = ticker.get_by_asset_id(tx.asset_id)
-            if asset_type and (not ticker_entry or ticker_entry.type != asset_type):
-                continue
-            trades.append(
-                Trade(
-                    transaction_id=tx.transaction_id,
-                    trade_id=tx.trade_id,
-                    type=tx.operation_type,
-                    asset_id=tx.asset_id,
-                    asset_symbol=ticker_entry.symbol if ticker_entry else "",
-                    asset_name=ticker_entry.name if ticker_entry else "",
-                    asset_type=ticker_entry.type if ticker_entry else "",
-                    asset_amount=tx.asset_amount,
-                    fee_amount=tx.fee_amount,
-                    credited_at=tx.credited_at,
-                    price_eur=ticker_entry.price_eur if ticker_entry else None,
+        async for page in self._paginate_pages(
+            "/v1/transactions",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+        ):
+            for raw_tx in page.data:
+                tx = Transaction.model_validate(raw_tx)
+                if not tx.is_trade or (trade_type and tx.operation_type != trade_type):
+                    continue
+                if ticker is None:
+                    ticker = await self.fetch_ticker()
+                ticker_entry = ticker.get_by_asset_id(tx.asset_id)
+                if asset_type and (not ticker_entry or ticker_entry.type != asset_type):
+                    continue
+                trades.append(
+                    Trade(
+                        transaction_id=tx.transaction_id,
+                        trade_id=tx.trade_id,
+                        type=tx.operation_type,
+                        asset_id=tx.asset_id,
+                        asset_symbol=ticker_entry.symbol if ticker_entry else "",
+                        asset_name=ticker_entry.name if ticker_entry else "",
+                        asset_type=ticker_entry.type if ticker_entry else "",
+                        asset_amount=tx.asset_amount,
+                        fee_amount=tx.fee_amount,
+                        credited_at=tx.credited_at,
+                        price_eur=ticker_entry.price_eur if ticker_entry else None,
+                    )
                 )
-            )
 
-            if limit and len(trades) >= limit:
-                break
+                if limit and len(trades) >= limit:
+                    return trades
 
         return trades
 

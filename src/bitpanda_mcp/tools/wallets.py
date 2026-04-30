@@ -19,9 +19,16 @@ async def list_wallets(
     to filter by asset UUID.
     """
     try:
-        wallets = await get_bp_client(ctx).list_wallets(asset_id=asset_id, page_size=page_size, limit=limit)
+        fetch_limit = 0 if non_zero and limit > 0 else limit
+        wallets = await get_bp_client(ctx).list_wallets(
+            asset_id=asset_id,
+            page_size=page_size,
+            limit=fetch_limit,
+        )
         if non_zero:
             wallets = [w for w in wallets if w.balance_float > 0]
+            if limit > 0:
+                wallets = wallets[:limit]
         return {"count": len(wallets), "wallets": [w.model_dump(mode="json") for w in wallets]}
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e

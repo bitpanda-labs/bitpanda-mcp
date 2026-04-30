@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -69,6 +70,28 @@ class BaseClient:
     ) -> list[dict[str, Any]]:
         """Fetch all pages of a cursor-paginated endpoint."""
         all_items: list[dict[str, Any]] = []
+        async for page in self._paginate_pages(
+            path,
+            params=params,
+            cursor_param=cursor_param,
+            page_size=page_size,
+        ):
+            all_items.extend(page.data)
+
+            if limit and len(all_items) >= limit:
+                return all_items[:limit]
+
+        return all_items
+
+    async def _paginate_pages(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        cursor_param: str = "after",
+        page_size: int = 25,
+    ) -> AsyncIterator[Page]:
+        """Yield parsed pages from a cursor-paginated endpoint."""
         base_params = dict(params or {})
         base_params["page_size"] = page_size
         cursor: str | None = None
@@ -79,10 +102,7 @@ class BaseClient:
                 request_params[cursor_param] = cursor
             raw = await self._get(path, request_params)
             page = Page.model_validate(raw)
-            all_items.extend(page.data)
-
-            if limit and len(all_items) >= limit:
-                return all_items[:limit]
+            yield page
 
             if not page.has_next_page:
                 break
@@ -90,8 +110,6 @@ class BaseClient:
             cursor = page.get_next_cursor()
             if not cursor:
                 break
-
-        return all_items
 
 
 def _extract_error_detail(resp: httpx.Response) -> str:

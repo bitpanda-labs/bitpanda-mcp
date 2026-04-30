@@ -1,3 +1,4 @@
+import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
@@ -23,8 +24,8 @@ def _transaction(tid: str, trade_type: str, asset_id: str, trade_id: str = "") -
     }
 
 
-def _page(records: list[dict]) -> dict:
-    return {"data": records, "has_next_page": False}
+def _page(records: list[dict], next_cursor: str = "") -> dict:
+    return {"data": records, "end_cursor": next_cursor, "has_next_page": bool(next_cursor)}
 
 
 TICKER_RESPONSE = {
@@ -131,6 +132,56 @@ async def test_list_trades_respects_limit(mcp_client, mock_router: respx.MockRou
     result = await mcp_client.call_tool("list_trades", {"limit": 1})
     assert result.data["count"] == 1
     assert result.data["trades"][0]["trade_id"] == "trade-tx1"
+
+
+async def test_list_trades_limit_applies_after_trade_type_filter_across_pages(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(200, json=_page([_transaction("tx1", "sell", "asset-btc")], "cursor-1"))
+        assert "after=cursor-1" in str(request.url)
+        return httpx.Response(200, json=_page([_transaction("tx2", "buy", "asset-eth")]))
+
+    mock_router.get("/v1/transactions").mock(side_effect=_handler)
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+
+    result = await mcp_client.call_tool("list_trades", {"trade_type": "buy", "limit": 1, "page_size": 1})
+
+    assert result.data["count"] == 1
+    assert result.data["trades"][0]["trade_id"] == "trade-tx2"
+    assert calls["n"] == 2
+
+
+async def test_list_trades_limit_applies_after_asset_type_filter_across_pages(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            records = [_transaction(f"tx{i}", "buy", "asset-unknown") for i in range(5)]
+            return httpx.Response(200, json=_page(records, "cursor-1"))
+        if calls["n"] == 2:
+            records = [_transaction(f"tx{i}", "buy", "asset-unknown") for i in range(5, 10)]
+            return httpx.Response(200, json=_page(records, "cursor-2"))
+        assert "after=cursor-2" in str(request.url)
+        return httpx.Response(200, json=_page([_transaction("tx10", "buy", "asset-btc")]))
+
+    mock_router.get("/v1/transactions").mock(side_effect=_handler)
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+
+    result = await mcp_client.call_tool(
+        "list_trades", {"asset_type": "cryptocoin", "limit": 1, "page_size": 5}
+    )
+
+    assert result.data["count"] == 1
+    assert result.data["trades"][0]["trade_id"] == "trade-tx10"
+    assert calls["n"] == 3
 
 
 async def test_list_trades_all_bypasses_limit(mcp_client, mock_router: respx.MockRouter) -> None:

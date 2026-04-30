@@ -16,16 +16,6 @@ class BitpandaAPIError(Exception):
         return self.status_code in (401, 403)
 
 
-class PageMeta(BaseModel):
-    """Legacy pagination metadata envelope returned by collection endpoints."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    total_count: int = 0
-    page_size: int | None = None
-    next_cursor: str | None = None
-
-
 class Page(BaseModel):
     """Generic cursor-paginated response wrapper."""
 

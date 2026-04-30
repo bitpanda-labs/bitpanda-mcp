@@ -58,11 +58,11 @@ Get your Bitpanda API key at [web.bitpanda.com/apikey](https://web.bitpanda.com/
 |------|----------|-------------|
 | `get_portfolio` | portfolio | Aggregated portfolio view across all assets with EUR valuations and `sort`/`sort_by` |
 | `get_price` | market-data | Current ticker price and currency for any asset by symbol (BTC, ETH, SOL, and more) |
-| `list_prices` | market-data | Ticker prices for held assets, or all ticker assets with `all=true`/`all_assets=true` |
+| `list_prices` | market-data | Ticker prices for held assets with ticker data, or a capped market-wide list with `all=true`/`all_assets=true` and `limit` |
 | `get_asset` | market-data | Asset metadata by asset UUID |
 | `list_wallets` | wallets | All Bitpanda asset wallet balances, with `non_zero`, `asset_id`, `page_size`, and `limit` filters |
-| `list_transactions` | transactions | Asset transaction history with `wallet_id`, `flow`, `asset_id`, date filters, and `all=true` |
-| `list_trades` | trades | Buy/sell activity derived from asset transactions, with `operation`/`trade_type`, `asset_type`, date filters, and `all=true` |
+| `list_transactions` | transactions | Raw asset transaction history with `wallet_id`, `flow`, `asset_id`, date filters, and `all=true` |
+| `list_trades` | trades | Normalized buy/sell activity derived from asset transactions, with `operation`/`trade_type`, `asset_type`, date filters, and `all=true` |
 
 All tools are **read-only** and annotated with `readOnlyHint=true`. The server never writes to or modifies your Bitpanda account.
 
@@ -75,7 +75,7 @@ All tools are **read-only** and annotated with `readOnlyHint=true`. The server n
 
 ## Self-Hosted Bitpanda MCP Server (HTTP / Docker)
 
-Run the server as a remote HTTP service — multiple users each authenticate per-request with their own Bitpanda API key as a Bearer token. Stateless design supports horizontal scaling.
+Run the server as a remote HTTP service — multiple users each authenticate per-request with their own Bitpanda API key in the `X-Api-Key` header. Stateless design supports horizontal scaling.
 
 ### Start the HTTP server
 
@@ -114,14 +114,14 @@ Health check: `GET /healthz` → `{"status": "ok"}`.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `BITPANDA_API_KEY` | stdio only | — | Bitpanda API key (in HTTP mode, each client sends their own key as a Bearer token) |
+| `BITPANDA_API_KEY` | stdio only | — | Bitpanda API key (in HTTP mode, each client sends their own key as `X-Api-Key`) |
 | `BITPANDA_BASE_URL` | No | `https://developer.bitpanda.com` | Bitpanda API base URL |
 | `REQUEST_TIMEOUT_S` | No | `30` | HTTP request timeout in seconds |
 | `FASTMCP_TRANSPORT` | No | `stdio` | Transport: `stdio` or `streamable-http` |
 | `FASTMCP_HOST` | No | `127.0.0.1` | HTTP bind address |
 | `FASTMCP_PORT` | No | `8000` | HTTP port |
 | `FASTMCP_STATELESS_HTTP` | No | `false` | Stateless mode for horizontal scaling |
-| `MCP_AUTH_HEADER` | No | — | Custom header name for the API key (e.g. `X-Api-Key`). Useful when a gateway intercepts the `Authorization` header. |
+| `MCP_AUTH_HEADER` | No | `X-Api-Key` | Header name for per-request API keys in HTTP mode. Override only if your gateway requires a different header. |
 
 ## Frequently Asked Questions
 

@@ -126,6 +126,7 @@ async def test_list_prices_for_held_assets(mcp_client, mock_router: respx.MockRo
             "data": [
                 {"wallet_id": "w1", "asset_id": "asset-btc", "balance": "1.0"},
                 {"wallet_id": "w2", "asset_id": "asset-eth", "balance": "0.0"},
+                {"wallet_id": "w3", "asset_id": "asset-missing", "balance": "2.0"},
             ],
             "has_next_page": False,
         }
@@ -133,7 +134,9 @@ async def test_list_prices_for_held_assets(mcp_client, mock_router: respx.MockRo
 
     result = await mcp_client.call_tool("list_prices", {})
     assert result.data["count"] == 1
+    assert result.data["total_available"] == 1
     assert result.data["prices"][0]["symbol"] == "BTC"
+    assert result.data["skipped_asset_ids"] == ["asset-missing"]
 
 
 async def test_list_prices_all_assets(mcp_client, mock_router: respx.MockRouter) -> None:
@@ -141,6 +144,7 @@ async def test_list_prices_all_assets(mcp_client, mock_router: respx.MockRouter)
 
     result = await mcp_client.call_tool("list_prices", {"all_assets": True})
     assert result.data["count"] == 3
+    assert result.data["total_available"] == 3
     assert [item["symbol"] for item in result.data["prices"]] == ["BTC", "ETH", "NOPRICE"]
 
 
@@ -150,6 +154,25 @@ async def test_list_prices_all_cli_alias(mcp_client, mock_router: respx.MockRout
     result = await mcp_client.call_tool("list_prices", {"all": True})
 
     assert result.data["count"] == 3
+
+
+async def test_list_prices_limit_caps_returned_rows(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+
+    result = await mcp_client.call_tool("list_prices", {"all": True, "limit": 2})
+
+    assert result.data["count"] == 2
+    assert result.data["total_available"] == 3
+    assert [item["symbol"] for item in result.data["prices"]] == ["BTC", "ETH"]
+
+
+async def test_list_prices_limit_zero_returns_all_rows(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+
+    result = await mcp_client.call_tool("list_prices", {"all": True, "limit": 0})
+
+    assert result.data["count"] == 3
+    assert result.data["total_available"] == 3
 
 
 async def test_list_prices_api_error(mcp_client, mock_router: respx.MockRouter) -> None:
