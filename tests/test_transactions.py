@@ -6,115 +6,102 @@ from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
 
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
-from bitpanda_mcp.tools.transactions import list_crypto_transactions, list_fiat_transactions
+from bitpanda_mcp.tools.transactions import list_transactions
 
 
-def _fiat_tx(tid: str, tx_type: str) -> dict:
+def _transaction(tid: str, operation_type: str, flow: str = "incoming") -> dict:
     return {
-        "type": "fiat_wallet_transaction",
-        "id": tid,
-        "attributes": {
-            "fiat_wallet_id": "fw1",
-            "fiat_id": "1",
-            "amount": "500.00",
-            "fee": "0.00",
-            "type": tx_type,
-            "status": "finished",
-            "in_or_out": "incoming",
-        },
+        "transaction_id": tid,
+        "operation_id": f"op-{tid}",
+        "asset_id": "asset-btc",
+        "account_id": "account-1",
+        "wallet_id": "wallet-1",
+        "asset_amount": "0.1",
+        "fee_amount": "0.00000000",
+        "operation_type": operation_type,
+        "transaction_type": "transfer",
+        "flow": flow,
+        "credited_at": "2026-04-20T10:00:00Z",
+        "compensates": "",
+        "trade_id": "",
     }
 
 
-def _crypto_tx(tid: str, tx_type: str) -> dict:
-    return {
-        "type": "wallet_transaction",
-        "id": tid,
-        "attributes": {
-            "amount": "0.1",
-            "wallet_id": "w1",
-            "cryptocoin_id": "1",
-            "cryptocoin_symbol": "BTC",
-            "fee": "0.00000000",
-            "type": tx_type,
-            "status": "finished",
-            "in_or_out": "incoming",
-        },
-    }
-
-
-def _page(records: list[dict], total: int, page_size: int = 25, next_cursor: str | None = None) -> dict:
+def _page(records: list[dict], page_size: int = 25, next_cursor: str = "") -> dict:
     return {
         "data": records,
-        "meta": {
-            "total_count": total,
-            "page_size": page_size,
-            "next_cursor": next_cursor,
-        },
+        "page_size": page_size,
+        "end_cursor": next_cursor,
+        "has_next_page": bool(next_cursor),
     }
 
 
-async def test_list_fiat_transactions(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/fiatwallets/transactions").respond(json=_page([_fiat_tx("ft1", "deposit")], 1))
-
-    result = await mcp_client.call_tool("list_fiat_transactions", {})
-    assert result.data["count"] == 1
-    tx = result.data["fiat_transactions"][0]
-    assert tx["id"] == "ft1"
-    assert tx["type"] == "deposit"
-
-
-async def test_list_fiat_transactions_with_status_filter(
-    bp_client: BitpandaClient, mock_router: respx.MockRouter
-) -> None:
-    route = mock_router.get("/v1/fiatwallets/transactions").respond(json=_page([], 0))
-    items = await bp_client.list_fiat_transactions(status="finished")
+async def test_list_transactions_filters(bp_client: BitpandaClient, mock_router: respx.MockRouter) -> None:
+    route = mock_router.get("/v1/transactions").respond(json=_page([]))
+    items = await bp_client.list_transactions(
+        wallet_id="wallet-1",
+        flow="incoming",
+        asset_id="asset-btc",
+        from_including="2026-01-01",
+        to_excluding="2026-02-01",
+    )
     assert items == []
-    assert "status=finished" in str(route.calls[0].request.url)
+    url = str(route.calls[0].request.url)
+    assert "wallet_id=wallet-1" in url
+    assert "flow=incoming" in url
+    assert "asset_id=asset-btc" in url
+    assert "from_including=2026-01-01" in url
+    assert "to_excluding=2026-02-01" in url
 
 
-async def test_list_crypto_transactions(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/transactions").respond(json=_page([_crypto_tx("ct1", "deposit")], 1))
+async def test_list_transactions_tool_filters(mcp_client, mock_router: respx.MockRouter) -> None:
+    route = mock_router.get("/v1/transactions").respond(json=_page([_transaction("tx1", "deposit")]))
+    result = await mcp_client.call_tool(
+        "list_transactions",
+        {
+            "wallet_id": "wallet-1",
+            "flow": "incoming",
+            "asset_id": "asset-btc",
+            "from_including": "2026-01-01",
+            "to_excluding": "2026-02-01",
+            "limit": 1,
+        },
+    )
+    assert result.data["transactions"][0]["transaction_id"] == "tx1"
+    url = str(route.calls[0].request.url)
+    assert "wallet_id=wallet-1" in url
+    assert "flow=incoming" in url
+    assert "asset_id=asset-btc" in url
+    assert "from_including=2026-01-01" in url
+    assert "to_excluding=2026-02-01" in url
 
-    result = await mcp_client.call_tool("list_crypto_transactions", {})
-    assert result.data["count"] == 1
-    tx = result.data["crypto_transactions"][0]
-    assert tx["id"] == "ct1"
-    assert tx["cryptocoin_symbol"] == "BTC"
+
+async def test_list_transactions_all_bypasses_default_limit(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    records = [_transaction(f"tx{i}", "deposit") for i in range(30)]
+    mock_router.get("/v1/transactions").respond(json=_page(records, page_size=30))
+
+    result = await mcp_client.call_tool("list_transactions", {"all": True})
+
+    assert result.data["count"] == 30
+    assert result.data["transactions"][-1]["transaction_id"] == "tx29"
 
 
-async def test_list_fiat_transactions_error(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/fiatwallets/transactions").respond(status_code=500, json={"message": "Server error"})
+async def test_list_transactions_error(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/transactions").respond(status_code=500, json={"message": "Server error"})
     with pytest.raises(ToolError, match="Server error"):
-        await mcp_client.call_tool("list_fiat_transactions", {})
+        await mcp_client.call_tool("list_transactions", {})
 
 
-async def test_list_crypto_transactions_error(mcp_client, mock_router: respx.MockRouter) -> None:
-    mock_router.get("/v1/wallets/transactions").respond(status_code=500, json={"message": "Server error"})
-    with pytest.raises(ToolError, match="Server error"):
-        await mcp_client.call_tool("list_crypto_transactions", {})
-
-
-async def test_list_fiat_transactions_validation_error_direct() -> None:
+async def test_list_transactions_validation_error_direct() -> None:
     ctx = MagicMock()
     bp = MagicMock()
-    bp.list_fiat_transactions = AsyncMock(
+    bp.list_transactions = AsyncMock(
         side_effect=ValidationError.from_exception_data(
             "Page", [{"type": "missing", "loc": ("data",), "msg": "missing", "input": {}}]
         )
     )
     ctx.lifespan_context = {"bp": bp}
     with pytest.raises(ToolError, match="Unexpected API response"):
-        await list_fiat_transactions(ctx)
-
-
-async def test_list_crypto_transactions_validation_error_direct() -> None:
-    ctx = MagicMock()
-    bp = MagicMock()
-    bp.list_crypto_transactions = AsyncMock(
-        side_effect=ValidationError.from_exception_data(
-            "Page", [{"type": "missing", "loc": ("data",), "msg": "missing", "input": {}}]
-        )
-    )
-    ctx.lifespan_context = {"bp": bp}
-    with pytest.raises(ToolError, match="Unexpected API response"):
-        await list_crypto_transactions(ctx)
+        await list_transactions(ctx)

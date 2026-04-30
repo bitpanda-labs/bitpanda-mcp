@@ -18,7 +18,7 @@ def _collect_balances(wallets: list["Wallet"]) -> dict[str, float]:
         bal = w.balance_float
         if bal <= 0:
             continue
-        key = w.cryptocoin_symbol.upper()
+        key = w.asset_id
         if not key:
             continue
         balances[key] = balances.get(key, 0.0) + bal
@@ -28,11 +28,11 @@ def _collect_balances(wallets: list["Wallet"]) -> dict[str, float]:
 def _build_holdings(balances: dict[str, float], ticker: "Ticker") -> tuple[list[dict], list[str], float]:
     holdings: list[dict] = []
     skipped: list[str] = []
-    total_eur = 0.0
-    for symbol, balance in balances.items():
-        entry = ticker.get_by_symbol(symbol)
+    total_eur: float = 0.0
+    for asset_id, balance in balances.items():
+        entry = ticker.get_by_asset_id(asset_id)
         if not entry:
-            skipped.append(symbol)
+            skipped.append(asset_id)
             continue
         try:
             price = float(entry.price_eur)
@@ -42,7 +42,9 @@ def _build_holdings(balances: dict[str, float], ticker: "Ticker") -> tuple[list[
         total_eur += eur_value
         holdings.append(
             {
-                "symbol": symbol,
+                "asset_id": asset_id,
+                "symbol": entry.symbol,
+                "name": entry.name,
                 "balance": balance,
                 "price_eur": entry.price_eur,
                 "value_eur": round(eur_value, 2),
@@ -51,13 +53,19 @@ def _build_holdings(balances: dict[str, float], ticker: "Ticker") -> tuple[list[
     return holdings, skipped, total_eur
 
 
-async def get_portfolio(ctx: Context, sort_by: str = "value") -> dict:
+async def get_portfolio(ctx: Context, sort_by: str | None = None, sort: str | None = None) -> dict:
     """Get an aggregated portfolio view with current EUR valuations.
 
     Returns each held asset with balance, price, and EUR value. Sorted by
-    ``value`` (default) or ``name``.
+    ``value`` (default) or ``name``. ``sort`` is a CLI-compatible alias.
     """
     try:
+        if sort and sort_by and sort != sort_by:
+            raise ToolError("Conflicting values provided for 'sort' and 'sort_by'.")
+        effective_sort = sort or sort_by or "value"
+        if effective_sort not in {"value", "name"}:
+            raise ToolError("'sort'/'sort_by' must be either 'value' or 'name'.")
+
         client = get_bp_client(ctx)
         wallets = await client.list_wallets()
         ticker = await client.fetch_ticker()
@@ -65,8 +73,8 @@ async def get_portfolio(ctx: Context, sort_by: str = "value") -> dict:
         balances = _collect_balances(wallets)
         holdings, skipped_symbols, total_eur = _build_holdings(balances, ticker)
 
-        if sort_by == "name":
-            holdings.sort(key=lambda h: h["symbol"])
+        if effective_sort == "name":
+            holdings.sort(key=lambda h: h["name"])
         else:
             holdings.sort(key=lambda h: h["value_eur"], reverse=True)
 
@@ -76,7 +84,7 @@ async def get_portfolio(ctx: Context, sort_by: str = "value") -> dict:
             "holdings": holdings,
         }
         if skipped_symbols:
-            result["skipped_symbols"] = skipped_symbols
+            result["skipped_asset_ids"] = skipped_symbols
         return result
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e

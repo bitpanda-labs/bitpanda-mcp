@@ -55,11 +55,12 @@ def _mcp_headers(extra: dict[str, str]) -> dict[str, str]:
     }
 
 
-def test_build_http_app_without_auth_header_does_not_wrap(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_http_app_uses_x_api_key_header_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MCP_AUTH_HEADER", raising=False)
     settings = Settings(_env_file=None, FASTMCP_TRANSPORT="streamable-http")
     app = build_http_app(settings)
-    assert not isinstance(app, ApiKeyHeaderMiddleware)
+    assert isinstance(app, ApiKeyHeaderMiddleware)
+    assert app.header == b"x-api-key"
 
 
 def test_build_http_app_with_auth_header_wraps_with_middleware() -> None:

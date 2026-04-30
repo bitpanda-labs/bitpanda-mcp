@@ -6,36 +6,30 @@ from bitpanda_mcp.clients import get_bp_client
 from bitpanda_mcp.models.common import BitpandaAPIError
 
 
-async def list_fiat_transactions(
+async def list_transactions(
     ctx: Context,
-    status: str | None = None,
+    wallet_id: str | None = None,
+    flow: str | None = None,
+    asset_id: str | None = None,
+    from_including: str | None = None,
+    to_excluding: str | None = None,
+    all: bool = False,  # noqa: A002 - keep MCP argument aligned with bitpanda-cli
     page_size: int = 25,
-    limit: int = 100,
+    limit: int = 25,
 ) -> dict:
-    """List fiat wallet transactions (deposits, withdrawals, payments).
-
-    Optional filter: ``status`` (e.g. ``finished``, ``pending``).
-    """
+    """List asset transactions with optional wallet, flow, asset, and date filters."""
     try:
-        items = await get_bp_client(ctx).list_fiat_transactions(
-            status=status, page_size=page_size, limit=limit
+        fetch_limit = 0 if all else limit
+        items = await get_bp_client(ctx).list_transactions(
+            wallet_id=wallet_id,
+            flow=flow,
+            asset_id=asset_id,
+            from_including=from_including,
+            to_excluding=to_excluding,
+            page_size=page_size,
+            limit=fetch_limit,
         )
-        return {"count": len(items), "fiat_transactions": items}
-    except BitpandaAPIError as e:
-        raise ToolError(e.detail) from e
-    except ValidationError as e:
-        raise ToolError(f"Unexpected API response: {e}") from e
-
-
-async def list_crypto_transactions(
-    ctx: Context,
-    page_size: int = 25,
-    limit: int = 100,
-) -> dict:
-    """List crypto wallet transactions (deposits, withdrawals, transfers)."""
-    try:
-        items = await get_bp_client(ctx).list_crypto_transactions(page_size=page_size, limit=limit)
-        return {"count": len(items), "crypto_transactions": items}
+        return {"count": len(items), "transactions": [item.model_dump(mode="json") for item in items]}
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
     except ValidationError as e:
