@@ -1,5 +1,9 @@
-from pydantic import Field
+from typing import Annotated
+
+from pydantic import Field, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+HeaderName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Settings(BaseSettings):
@@ -23,4 +27,4 @@ class Settings(BaseSettings):
     server_host: str = Field(default="127.0.0.1", alias="FASTMCP_HOST")
     server_port: int = Field(default=8000, alias="FASTMCP_PORT", ge=1, le=65535)
 
-    mcp_auth_header: str = Field(default="X-Api-Key", alias="MCP_AUTH_HEADER")
+    mcp_auth_header: HeaderName = Field(default="X-Api-Key", alias="MCP_AUTH_HEADER")

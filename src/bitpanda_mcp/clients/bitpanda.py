@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -36,6 +37,25 @@ class BitpandaClient(BaseClient):
             limit=limit,
         )
         return [Wallet.model_validate(item) for item in raw_items]
+
+    async def iter_wallet_pages(
+        self,
+        *,
+        asset_id: str | None = None,
+        page_size: int = 25,
+    ) -> AsyncIterator[list[Wallet]]:
+        """Yield wallet pages without pre-collecting the full result set."""
+        params: dict[str, Any] = {}
+        if asset_id:
+            params["asset_id"] = asset_id
+
+        async for page in self._paginate_pages(
+            "/v1/wallets/",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+        ):
+            yield [Wallet.model_validate(item) for item in page.data]
 
     # --- Transactions ---
 

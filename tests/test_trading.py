@@ -90,6 +90,11 @@ async def test_list_trades_operation_cli_alias(mcp_client, mock_router: respx.Mo
     assert result.data["trades"][0]["type"] == "sell"
 
 
+async def test_list_trades_rejects_conflicting_type_aliases(mcp_client) -> None:
+    with pytest.raises(ToolError, match="Conflicting values"):
+        await mcp_client.call_tool("list_trades", {"trade_type": "buy", "operation": "sell"})
+
+
 async def test_list_trades_asset_type_and_date_filters(mcp_client, mock_router: respx.MockRouter) -> None:
     route = mock_router.get("/v1/transactions").respond(
         json=_page([_transaction("tx1", "buy", "asset-btc"), _transaction("tx2", "sell", "asset-eth")])

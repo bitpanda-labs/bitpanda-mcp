@@ -97,6 +97,16 @@ async def test_get_portfolio_sort_cli_alias(mcp_client, mock_router: respx.MockR
     assert [h["symbol"] for h in holdings] == ["BTC", "ETH"]
 
 
+async def test_get_portfolio_rejects_conflicting_sort_aliases(mcp_client) -> None:
+    with pytest.raises(ToolError, match="Conflicting values"):
+        await mcp_client.call_tool("get_portfolio", {"sort": "name", "sort_by": "value"})
+
+
+async def test_get_portfolio_rejects_unknown_sort(mcp_client) -> None:
+    with pytest.raises(ToolError, match="must be either"):
+        await mcp_client.call_tool("get_portfolio", {"sort": "symbol"})
+
+
 async def test_get_portfolio_non_numeric_price(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/wallets/").respond(json={"data": [_wallet("w1", "asset-brk", "10.0")]})
     mock_router.get("/v1/ticker").respond(

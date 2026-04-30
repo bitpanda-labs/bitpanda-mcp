@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from bitpanda_mcp.config import Settings
 
@@ -35,7 +36,7 @@ def test_settings_transport_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_settings_mcp_auth_header_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MCP_AUTH_HEADER", "X-Api-Key")
+    monkeypatch.setenv("MCP_AUTH_HEADER", "  X-Api-Key  ")
     s = Settings(_env_file=None)
     assert s.mcp_auth_header == "X-Api-Key"
 
@@ -44,3 +45,9 @@ def test_settings_mcp_auth_header_default(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.delenv("MCP_AUTH_HEADER", raising=False)
     s = Settings(_env_file=None)
     assert s.mcp_auth_header == "X-Api-Key"
+
+
+def test_settings_mcp_auth_header_rejects_blank(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_AUTH_HEADER", "   ")
+    with pytest.raises(ValidationError, match="MCP_AUTH_HEADER"):
+        Settings(_env_file=None)

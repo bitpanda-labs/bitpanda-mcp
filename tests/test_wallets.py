@@ -80,6 +80,77 @@ async def test_list_wallets_non_zero_limit_applies_after_filter(
     assert calls["n"] == 2
 
 
+async def test_list_wallets_non_zero_limit_stops_after_enough_matches(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(
+                200,
+                json={
+                    "data": [_wallet_record("w1", "asset-empty", "0")],
+                    "end_cursor": "cursor-1",
+                    "has_next_page": True,
+                },
+            )
+        if calls["n"] == 2:
+            assert "after=cursor-1" in str(request.url)
+            return httpx.Response(
+                200,
+                json={
+                    "data": [_wallet_record("w2", "asset-btc", "0.05")],
+                    "end_cursor": "cursor-2",
+                    "has_next_page": True,
+                },
+            )
+        raise AssertionError("wallet pagination should stop after collecting enough non-zero wallets")
+
+    mock_router.get("/v1/wallets/").mock(side_effect=_handler)
+
+    result = await mcp_client.call_tool("list_wallets", {"non_zero": True, "limit": 1, "page_size": 1})
+
+    assert result.data["count"] == 1
+    assert result.data["wallets"][0]["wallet_id"] == "w2"
+    assert calls["n"] == 2
+
+
+async def test_list_wallets_non_zero_limit_exhausts_pages_when_matches_are_insufficient(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    calls = {"n": 0}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            assert "asset_id=asset-btc" in str(request.url)
+            return httpx.Response(
+                200,
+                json={
+                    "data": [_wallet_record("w1", "asset-btc", "0")],
+                    "end_cursor": "cursor-1",
+                    "has_next_page": True,
+                },
+            )
+        assert "after=cursor-1" in str(request.url)
+        return httpx.Response(
+            200,
+            json={"data": [_wallet_record("w2", "asset-btc", "0.05")], "has_next_page": False},
+        )
+
+    mock_router.get("/v1/wallets/").mock(side_effect=_handler)
+
+    result = await mcp_client.call_tool(
+        "list_wallets", {"non_zero": True, "asset_id": "asset-btc", "limit": 2, "page_size": 1}
+    )
+
+    assert result.data["count"] == 1
+    assert result.data["wallets"][0]["wallet_id"] == "w2"
+    assert calls["n"] == 2
+
+
 async def test_list_wallets_filters(mcp_client, mock_router: respx.MockRouter) -> None:
     route = mock_router.get("/v1/wallets/").respond(json={"data": [_wallet_record("w1", "asset-btc", "1")]})
 

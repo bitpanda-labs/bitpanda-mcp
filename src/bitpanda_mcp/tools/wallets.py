@@ -19,16 +19,22 @@ async def list_wallets(
     to filter by asset UUID.
     """
     try:
-        fetch_limit = 0 if non_zero and limit > 0 else limit
-        wallets = await get_bp_client(ctx).list_wallets(
-            asset_id=asset_id,
-            page_size=page_size,
-            limit=fetch_limit,
-        )
-        if non_zero:
-            wallets = [w for w in wallets if w.balance_float > 0]
-            if limit > 0:
-                wallets = wallets[:limit]
+        client = get_bp_client(ctx)
+        if non_zero and limit > 0:
+            wallets = []
+            async for page in client.iter_wallet_pages(asset_id=asset_id, page_size=page_size):
+                wallets.extend(w for w in page if w.balance_float > 0)
+                if len(wallets) >= limit:
+                    wallets = wallets[:limit]
+                    break
+        else:
+            wallets = await client.list_wallets(
+                asset_id=asset_id,
+                page_size=page_size,
+                limit=limit,
+            )
+            if non_zero:
+                wallets = [w for w in wallets if w.balance_float > 0]
         return {"count": len(wallets), "wallets": [w.model_dump(mode="json") for w in wallets]}
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e

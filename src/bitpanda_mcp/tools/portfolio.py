@@ -53,20 +53,25 @@ def _build_holdings(balances: dict[str, float], ticker: "Ticker") -> tuple[list[
     return holdings, skipped, total_eur
 
 
-async def get_portfolio(ctx: Context, sort_by: str = "value", sort: str | None = None) -> dict:
+async def get_portfolio(ctx: Context, sort_by: str | None = None, sort: str | None = None) -> dict:
     """Get an aggregated portfolio view with current EUR valuations.
 
     Returns each held asset with balance, price, and EUR value. Sorted by
     ``value`` (default) or ``name``. ``sort`` is a CLI-compatible alias.
     """
     try:
+        if sort and sort_by and sort != sort_by:
+            raise ToolError("Conflicting values provided for 'sort' and 'sort_by'.")
+        effective_sort = sort or sort_by or "value"
+        if effective_sort not in {"value", "name"}:
+            raise ToolError("'sort'/'sort_by' must be either 'value' or 'name'.")
+
         client = get_bp_client(ctx)
         wallets = await client.list_wallets()
         ticker = await client.fetch_ticker()
 
         balances = _collect_balances(wallets)
         holdings, skipped_symbols, total_eur = _build_holdings(balances, ticker)
-        effective_sort = sort or sort_by
 
         if effective_sort == "name":
             holdings.sort(key=lambda h: h["name"])

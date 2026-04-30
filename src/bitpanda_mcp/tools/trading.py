@@ -22,6 +22,8 @@ async def list_trades(
     Optional filters: ``trade_type``/``operation`` (buy/sell), ``asset_type``, and date range.
     """
     try:
+        if trade_type and operation and trade_type != operation:
+            raise ToolError("Conflicting values provided for 'trade_type' and 'operation'.")
         fetch_limit = 0 if all else limit
         effective_trade_type = trade_type or operation
         trades = await get_bp_client(ctx).list_trades(
