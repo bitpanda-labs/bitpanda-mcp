@@ -12,10 +12,9 @@ def portfolio_summary() -> str:
 def recent_activity() -> str:
     """Show and analyze my recent Bitpanda activity."""
     return (
-        "Please use list_trades for recent buy/sell activity, list_fiat_transactions "
-        "for fiat deposits and withdrawals, and list_crypto_transactions for crypto "
-        "deposits and transfers, then:\n"
+        "Please use list_trades for recent buy/sell activity and list_transactions "
+        "for deposits, withdrawals, and transfers, then:\n"
         "1. Summarize recent trades with amounts and dates\n"
-        "2. Show any fiat deposits or withdrawals\n"
-        "3. Calculate net investment flow (deposits minus withdrawals) if visible"
+        "2. Show recent deposits and withdrawals\n"
+        "3. Calculate net asset flow if visible"
     )

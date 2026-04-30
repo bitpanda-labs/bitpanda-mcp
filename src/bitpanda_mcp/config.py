@@ -11,7 +11,7 @@ class Settings(BaseSettings):
         default=None,
         description="Bitpanda API key. Required for stdio; in HTTP mode sent per-request as Bearer token.",
     )
-    bitpanda_base_url: str = Field(default="https://api.bitpanda.com")
+    bitpanda_base_url: str = Field(default="https://developer.bitpanda.com")
 
     request_timeout_s: float = Field(default=30.0, ge=1, le=120)
 

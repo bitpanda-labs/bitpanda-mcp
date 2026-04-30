@@ -63,31 +63,11 @@ class BaseClient:
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        cursor_param: str = "after",
         page_size: int = 25,
         limit: int = 0,
     ) -> list[dict[str, Any]]:
-        """Fetch all pages of a cursor-paginated endpoint and flatten JSON:API records.
-
-        Bitpanda collection responses have shape::
-
-            {"data": [{"id": "...", "type": "...", "attributes": {...}}],
-             "meta": {"total_count": N, "page_size": K, "next_cursor": "uuid"},
-             "links": {...}}
-
-        Pagination advances via the ``cursor`` query parameter. Iteration
-        stops on any of: reaching ``limit``, missing ``next_cursor``, an
-        empty page, a short page, or the internal ``_MAX_PAGES`` safety cap.
-
-        Args:
-            path: API path.
-            params: Extra query parameters (filters).
-            page_size: Items per page.
-            limit: Max total items to return. 0 means unlimited.
-
-        Returns:
-            Flat list of flattened records across all pages.
-
-        """
+        """Fetch all pages of a cursor-paginated endpoint."""
         all_items: list[dict[str, Any]] = []
         base_params = dict(params or {})
         base_params["page_size"] = page_size
@@ -96,16 +76,19 @@ class BaseClient:
         for _ in range(_MAX_PAGES):
             request_params = {**base_params}
             if cursor:
-                request_params["cursor"] = cursor
+                request_params[cursor_param] = cursor
             raw = await self._get(path, request_params)
             page = Page.model_validate(raw)
-            all_items.extend(flatten_jsonapi(item) for item in page.data)
+            all_items.extend(page.data)
 
             if limit and len(all_items) >= limit:
                 return all_items[:limit]
 
-            cursor = page.meta.next_cursor
-            if not cursor or not page.data or len(page.data) < page_size:
+            if not page.has_next_page:
+                break
+
+            cursor = page.get_next_cursor()
+            if not cursor:
                 break
 
         return all_items
