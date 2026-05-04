@@ -39,9 +39,11 @@ jobs:
           enable-cache: true
 
       - name: Verify version matches release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           PKG_VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
-          TAG="${{ github.event.release.tag_name }}"
+          TAG="$RELEASE_TAG"
           TAG="${TAG#v}"
           if [ "$PKG_VERSION" != "$TAG" ]; then
             echo "Version mismatch: pyproject.toml=$PKG_VERSION, tag=$TAG"
