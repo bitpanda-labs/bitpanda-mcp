@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 from fastmcp import Context
@@ -84,7 +85,15 @@ async def get_portfolio(ctx: Context, sort_by: str | None = None, sort: str | No
             "holdings": holdings,
         }
         if skipped_symbols:
-            result["skipped_asset_ids"] = skipped_symbols
+
+            async def _resolve(aid: str) -> dict:
+                try:
+                    a = await client.get_asset(aid)
+                    return {"asset_id": a.id, "name": a.name, "symbol": a.symbol}
+                except BitpandaAPIError:
+                    return {"asset_id": aid, "name": "", "symbol": ""}
+
+            result["skipped_assets"] = list(await asyncio.gather(*[_resolve(aid) for aid in skipped_symbols]))
         return result
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e

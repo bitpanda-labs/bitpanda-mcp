@@ -66,6 +66,9 @@ TICKER_RESPONSE = {
 async def test_get_portfolio(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/wallets/").respond(json=WALLETS_RESPONSE)
     mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/assets/asset-unknown").respond(
+        json={"data": {"id": "asset-unknown", "name": "Unknown Token", "symbol": "UNK"}}
+    )
 
     result = await mcp_client.call_tool("get_portfolio", {})
     data = result.data
@@ -76,12 +79,26 @@ async def test_get_portfolio(mcp_client, mock_router: respx.MockRouter) -> None:
     assert data["holdings"][0]["value_eur"] == 32500.0
     assert data["holdings"][1]["symbol"] == "ETH"
     assert data["holdings"][1]["value_eur"] == 7000.0
-    assert data["skipped_asset_ids"] == ["asset-unknown"]
+    assert data["skipped_assets"] == [{"asset_id": "asset-unknown", "name": "Unknown Token", "symbol": "UNK"}]
+
+
+async def test_get_portfolio_skipped_asset_fallback_on_error(
+    mcp_client, mock_router: respx.MockRouter
+) -> None:
+    mock_router.get("/v1/wallets/").respond(json=WALLETS_RESPONSE)
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/assets/asset-unknown").respond(status_code=404, json={"message": "Not found"})
+
+    result = await mcp_client.call_tool("get_portfolio", {})
+    assert result.data["skipped_assets"] == [{"asset_id": "asset-unknown", "name": "", "symbol": ""}]
 
 
 async def test_get_portfolio_sort_by_name(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/wallets/").respond(json=WALLETS_RESPONSE)
     mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/assets/asset-unknown").respond(
+        json={"data": {"id": "asset-unknown", "name": "Unknown Token", "symbol": "UNK"}}
+    )
 
     result = await mcp_client.call_tool("get_portfolio", {"sort_by": "name"})
     holdings = result.data["holdings"]
@@ -91,6 +108,9 @@ async def test_get_portfolio_sort_by_name(mcp_client, mock_router: respx.MockRou
 async def test_get_portfolio_sort_cli_alias(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/wallets/").respond(json=WALLETS_RESPONSE)
     mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/assets/asset-unknown").respond(
+        json={"data": {"id": "asset-unknown", "name": "Unknown Token", "symbol": "UNK"}}
+    )
 
     result = await mcp_client.call_tool("get_portfolio", {"sort": "name"})
     holdings = result.data["holdings"]
@@ -145,6 +165,7 @@ async def test_get_portfolio_skips_wallet_without_asset_id(mcp_client, mock_rout
 
     result = await mcp_client.call_tool("get_portfolio", {})
     assert [h["symbol"] for h in result.data["holdings"]] == ["BTC"]
+    assert "skipped_assets" not in result.data
 
 
 async def test_get_portfolio_validation_error_direct() -> None:

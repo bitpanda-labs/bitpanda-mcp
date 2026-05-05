@@ -131,12 +131,31 @@ async def test_list_prices_for_held_assets(mcp_client, mock_router: respx.MockRo
             "has_next_page": False,
         }
     )
+    mock_router.get("/v1/assets/asset-missing").respond(
+        json={"data": {"id": "asset-missing", "name": "Missing Token", "symbol": "MSS"}}
+    )
 
     result = await mcp_client.call_tool("list_prices", {})
     assert result.data["count"] == 1
     assert result.data["total_available"] == 1
     assert result.data["prices"][0]["symbol"] == "BTC"
-    assert result.data["skipped_asset_ids"] == ["asset-missing"]
+    assert result.data["skipped_assets"] == [
+        {"asset_id": "asset-missing", "name": "Missing Token", "symbol": "MSS"}
+    ]
+
+
+async def test_list_prices_skipped_asset_fallback_on_error(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/wallets/").respond(
+        json={
+            "data": [{"wallet_id": "w1", "asset_id": "asset-missing", "balance": "2.0"}],
+            "has_next_page": False,
+        }
+    )
+    mock_router.get("/v1/assets/asset-missing").respond(status_code=404, json={"message": "Not found"})
+
+    result = await mcp_client.call_tool("list_prices", {})
+    assert result.data["skipped_assets"] == [{"asset_id": "asset-missing", "name": "", "symbol": ""}]
 
 
 async def test_list_prices_all_assets(mcp_client, mock_router: respx.MockRouter) -> None:
@@ -191,7 +210,7 @@ async def test_list_prices_excludes_blank_asset_ids(mcp_client, mock_router: res
     result = await mcp_client.call_tool("list_prices", {})
     assert result.data["count"] == 1
     assert result.data["prices"][0]["symbol"] == "BTC"
-    assert "skipped_asset_ids" not in result.data
+    assert "skipped_assets" not in result.data
 
 
 async def test_list_prices_api_error(mcp_client, mock_router: respx.MockRouter) -> None:

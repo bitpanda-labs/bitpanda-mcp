@@ -1,3 +1,5 @@
+import asyncio
+
 from fastmcp import Context
 from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
@@ -77,7 +79,17 @@ async def list_prices(
 
         result: dict = {"count": len(prices), "total_available": total_available, "prices": prices}
         if skipped_asset_ids:
-            result["skipped_asset_ids"] = skipped_asset_ids
+
+            async def _resolve(aid: str) -> dict:
+                try:
+                    a = await client.get_asset(aid)
+                    return {"asset_id": a.id, "name": a.name, "symbol": a.symbol}
+                except BitpandaAPIError:
+                    return {"asset_id": aid, "name": "", "symbol": ""}
+
+            result["skipped_assets"] = list(
+                await asyncio.gather(*[_resolve(aid) for aid in skipped_asset_ids])
+            )
         return result
     except BitpandaAPIError as e:
         raise ToolError(e.detail) from e
