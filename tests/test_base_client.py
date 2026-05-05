@@ -1,4 +1,4 @@
-"""Tests for clients/base.py — error extraction, pagination, JSON:API flatten."""
+"""Tests for clients/base.py — error extraction, pagination."""
 
 from unittest.mock import patch
 
@@ -6,7 +6,6 @@ import httpx
 import pytest
 import respx
 
-from bitpanda_mcp.clients.base import flatten_jsonapi
 from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.models.common import BitpandaAPIError
 
@@ -211,30 +210,3 @@ def test_is_auth_error() -> None:
     assert err_401.is_auth_error is True
     assert err_403.is_auth_error is True
     assert err_500.is_auth_error is False
-
-
-def test_flatten_jsonapi_standard_record() -> None:
-    raw = {"type": "wallet", "id": "w1", "attributes": {"balance": "1.0", "name": "BTC Wallet"}}
-    out = flatten_jsonapi(raw)
-    assert out == {"balance": "1.0", "name": "BTC Wallet", "id": "w1", "type": "wallet"}
-
-
-def test_flatten_jsonapi_attrs_type_wins() -> None:
-    """When attributes has its own 'type' (e.g. trade 'buy'), envelope type is not overwritten."""
-    raw = {"type": "trade", "id": "t1", "attributes": {"type": "buy", "price": "100"}}
-    out = flatten_jsonapi(raw)
-    assert out["type"] == "buy"
-
-
-def test_flatten_jsonapi_type_without_id() -> None:
-    raw = {"type": "wallet", "attributes": {"balance": "1.0"}}
-    assert flatten_jsonapi(raw) == {"balance": "1.0", "type": "wallet"}
-
-
-def test_flatten_jsonapi_passthrough_non_dict() -> None:
-    assert flatten_jsonapi("not-a-dict") == "not-a-dict"
-
-
-def test_flatten_jsonapi_no_attributes() -> None:
-    raw = {"type": "thing", "id": "x", "other": "value"}
-    assert flatten_jsonapi(raw) == raw

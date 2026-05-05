@@ -13,7 +13,7 @@ async def list_trades(
     asset_type: str | None = None,
     from_including: str | None = None,
     to_excluding: str | None = None,
-    all: bool = False,  # noqa: A002 - keep MCP argument aligned with bitpanda-cli
+    all: bool = False,  # noqa: A002
     page_size: int = 25,
     limit: int = 100,
 ) -> dict:

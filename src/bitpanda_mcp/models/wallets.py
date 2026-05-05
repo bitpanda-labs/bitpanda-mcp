@@ -23,16 +23,3 @@ class Wallet(BaseModel):
     @property
     def effective_wallet_type(self) -> str:
         return self.wallet_type or "regular"
-
-
-class FiatWallet(BaseModel):
-    """A fiat wallet."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(description="Fiat wallet UUID")
-    fiat_id: str = Field(default="", description="Numeric fiat ID")
-    fiat_symbol: str = Field(default="", description="Currency code (EUR, USD, ...)")
-    balance: str = Field(default="0", description="Current balance")
-    name: str = Field(default="", description="Wallet name")
-    pending_transactions_count: int = Field(default=0)

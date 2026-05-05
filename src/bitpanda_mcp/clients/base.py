@@ -12,26 +12,6 @@ _MAX_PAGES = 500
 _log = logging.getLogger(__name__)
 
 
-def flatten_jsonapi(record: Any) -> Any:
-    """Flatten a JSON:API ``{id, type, attributes: {...}}`` record to a single-level dict.
-
-    Non-dict inputs and records without ``attributes`` are returned unchanged.
-    ``id`` and ``type`` are preserved at the top level, attributes take precedence
-    for any other keys.
-    """
-    if not isinstance(record, dict):
-        return record
-    attrs = record.get("attributes")
-    if not isinstance(attrs, dict):
-        return record
-    out: dict[str, Any] = {**attrs}
-    if "id" in record:
-        out["id"] = record["id"]
-    if "type" in record and "type" not in attrs:
-        out["type"] = record["type"]
-    return out
-
-
 class BaseClient:
     """Shared async HTTP client logic for Bitpanda APIs."""
 
