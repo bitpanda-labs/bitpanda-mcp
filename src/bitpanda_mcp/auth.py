@@ -1,7 +1,8 @@
-"""Bearer token authentication for remote HTTP mode.
+"""Authentication helpers for remote HTTP mode.
 
-Users pass their Bitpanda API key as a Bearer token. The verifier accepts any
-non-empty token and makes it available to tools via ``get_access_token()``.
+Users pass their Bitpanda API key as ``X-Api-Key`` by default. The header
+middleware maps it to FastMCP's bearer-token auth internally so tools can read
+the key via ``get_access_token()``.
 """
 
 from fastmcp.server.auth import AccessToken, TokenVerifier
@@ -9,7 +10,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class BearerKeyVerifier(TokenVerifier):
-    """Accept any non-empty bearer token as a Bitpanda API key.
+    """Accept any non-empty token as a Bitpanda API key.
 
     Token validity is decided by the Bitpanda API per request (401/403);
     this verifier only filters out empty tokens to avoid an extra round-trip.

@@ -4,7 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-The official [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [Bitpanda](https://www.bitpanda.com). Connects AI agents — Claude, Cursor, VS Code Copilot, and any MCP-compatible client — directly to the Bitpanda API, giving them secure, read-only access to your cryptocurrency portfolio, crypto and fiat wallet balances, trade history, and real-time market prices.
+The official [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [Bitpanda](https://www.bitpanda.com). Connects AI agents — Claude, Cursor, VS Code Copilot, and any MCP-compatible client — directly to the Bitpanda API, giving them secure, read-only access to your asset portfolio, wallet balances, trade history, and real-time market prices.
 
 Built with [FastMCP 3.x](https://gofastmcp.com), Python 3.11+, and [uv](https://docs.astral.sh/uv/).
 
@@ -46,23 +46,23 @@ Get your Bitpanda API key at [web.bitpanda.com/apikey](https://web.bitpanda.com/
 
 ## What Can You Do With Bitpanda MCP?
 
-- **Analyze your crypto portfolio with Claude** — ask "what's my BTC allocation?" or "show me my top performing assets this month"
-- **Get real-time cryptocurrency prices** — BTC, ETH, and hundreds of other assets via natural language
-- **Review trade and transaction history** — "summarize my trades from last quarter" or "show me recent EUR deposits"
+- **Analyze your portfolio with Claude** — ask "what's my BTC allocation?" or "show me my top performing assets this month"
+- **Get real-time asset prices** — BTC, ETH, and hundreds of other assets via natural language
+- **Review trade and transaction history** — "summarize my trades from last quarter" or "show me recent transactions"
 - **Build AI agents that interact with Bitpanda data** — integrate Bitpanda portfolio data into any MCP-compatible AI workflow
-- **Automate crypto reporting** — feed wallet balances and trade history into AI-powered analysis pipelines
+- **Automate reporting** — feed wallet balances and trade history into AI-powered analysis pipelines
 
 ## Available MCP Tools
 
 | Tool | Category | Description |
 |------|----------|-------------|
-| `get_portfolio` | portfolio | Aggregated portfolio view across all assets with EUR valuations |
-| `get_price` | market-data | Current EUR price for any cryptocurrency by symbol (BTC, ETH, SOL, and more) |
-| `list_wallets` | wallets | All Bitpanda cryptocurrency wallet balances, with optional `non_zero` filter |
-| `list_fiat_wallets` | wallets | Fiat currency wallet balances (EUR, USD, GBP, CHF, and more) |
-| `list_fiat_transactions` | transactions | Fiat wallet transaction history with optional `status` filter |
-| `list_crypto_transactions` | transactions | Cryptocurrency transaction history — deposits, withdrawals, and transfers |
-| `list_trades` | trades | Full buy/sell trade history with optional `trade_type` filter |
+| `get_portfolio` | portfolio | Aggregated portfolio view across all assets with EUR valuations and `sort`/`sort_by` |
+| `get_price` | market-data | Current ticker price and currency for any asset by symbol (BTC, ETH, SOL, and more) |
+| `list_prices` | market-data | Ticker prices for held assets with ticker data, or a capped market-wide list with `all=true`/`all_assets=true` and `limit` |
+| `get_asset` | market-data | Asset metadata by asset UUID |
+| `list_wallets` | wallets | All Bitpanda asset wallet balances, with `non_zero`, `asset_id`, `page_size`, and `limit` filters |
+| `list_transactions` | transactions | Raw asset transaction history with `wallet_id`, `flow`, `asset_id`, date filters, and `all=true` |
+| `list_trades` | trades | Normalized buy/sell activity derived from asset transactions, with `operation`/`trade_type`, `asset_type`, date filters, and `all=true` |
 
 All tools are **read-only** and annotated with `readOnlyHint=true`. The server never writes to or modifies your Bitpanda account.
 
@@ -71,11 +71,11 @@ All tools are **read-only** and annotated with `readOnlyHint=true`. The server n
 | Prompt | Description |
 |--------|-------------|
 | `portfolio_summary` | Analyze portfolio composition and identify concentration risk |
-| `recent_activity` | Summarize recent trades and fiat transactions |
+| `recent_activity` | Summarize recent trades and asset transactions |
 
 ## Self-Hosted Bitpanda MCP Server (HTTP / Docker)
 
-Run the server as a remote HTTP service — multiple users each authenticate per-request with their own Bitpanda API key as a Bearer token. Stateless design supports horizontal scaling.
+Run the server as a remote HTTP service — multiple users each authenticate per-request with their own Bitpanda API key in the `X-Api-Key` header. Stateless design supports horizontal scaling.
 
 ### Start the HTTP server
 
@@ -114,14 +114,14 @@ Health check: `GET /healthz` → `{"status": "ok"}`.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `BITPANDA_API_KEY` | stdio only | — | Bitpanda API key (in HTTP mode, each client sends their own key as a Bearer token) |
-| `BITPANDA_BASE_URL` | No | `https://api.bitpanda.com` | Bitpanda API base URL |
+| `BITPANDA_API_KEY` | stdio only | — | Bitpanda API key (in HTTP mode, each client sends their own key as `X-Api-Key`) |
+| `BITPANDA_BASE_URL` | No | `https://developer.bitpanda.com` | Bitpanda API base URL |
 | `REQUEST_TIMEOUT_S` | No | `30` | HTTP request timeout in seconds |
 | `FASTMCP_TRANSPORT` | No | `stdio` | Transport: `stdio` or `streamable-http` |
 | `FASTMCP_HOST` | No | `127.0.0.1` | HTTP bind address |
 | `FASTMCP_PORT` | No | `8000` | HTTP port |
 | `FASTMCP_STATELESS_HTTP` | No | `false` | Stateless mode for horizontal scaling |
-| `MCP_AUTH_HEADER` | No | — | Custom header name for the API key (e.g. `X-Api-Key`). Useful when a gateway intercepts the `Authorization` header. |
+| `MCP_AUTH_HEADER` | No | `X-Api-Key` | Header name for per-request API keys in HTTP mode. Override only if your gateway requires a different header. |
 
 ## Frequently Asked Questions
 

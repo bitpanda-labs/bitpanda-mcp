@@ -53,7 +53,7 @@ Format: `type: short description`
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `style`
 
 Examples:
-- `feat: add list_fiat_wallets tool`
+- `feat: add wallet filtering`
 - `fix: correct ticker field names to match API`
 - `docs: update README install instructions`
 

@@ -1,66 +1,95 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 
-from bitpanda_mcp.clients.base import BaseClient, flatten_jsonapi
+from bitpanda_mcp.clients.base import BaseClient
+from bitpanda_mcp.models.assets import Asset, AssetEnvelope
 from bitpanda_mcp.models.market import Ticker, TickerEntry
-from bitpanda_mcp.models.transactions import Trade
-from bitpanda_mcp.models.wallets import FiatWallet, Wallet
+from bitpanda_mcp.models.transactions import Trade, Transaction
+from bitpanda_mcp.models.wallets import Wallet
 
 
 class BitpandaClient(BaseClient):
-    """Client for the Bitpanda Public API v1."""
+    """Client for the Bitpanda API v1."""
 
     def __init__(self, http: httpx.AsyncClient, api_key: str) -> None:
         super().__init__(http, {"X-Api-Key": api_key})
 
-    # --- Crypto Wallets ---
+    # --- Wallets ---
 
-    async def list_wallets(self) -> list[Wallet]:
-        """Fetch all crypto wallets.
-
-        ``/v1/wallets`` returns a flat ``{data: [...], last_user_action: {...}}``
-        envelope (no pagination).
-        """
-        raw = await self._get("/v1/wallets")
-        items = raw.get("data", []) if isinstance(raw, dict) else []
-        return [Wallet.model_validate(flatten_jsonapi(item)) for item in items]
-
-    # --- Fiat Wallets ---
-
-    async def list_fiat_wallets(self) -> list[FiatWallet]:
-        """Fetch all fiat currency wallets (EUR, USD, GBP, CHF, ...)."""
-        raw = await self._get("/v1/fiatwallets")
-        items = raw.get("data", []) if isinstance(raw, dict) else []
-        return [FiatWallet.model_validate(flatten_jsonapi(item)) for item in items]
-
-    # --- Fiat Wallet Transactions ---
-
-    async def list_fiat_transactions(
+    async def list_wallets(
         self,
         *,
-        status: str | None = None,
+        asset_id: str | None = None,
         page_size: int = 25,
         limit: int = 0,
-    ) -> list[dict[str, Any]]:
-        """Fetch fiat wallet transactions."""
+    ) -> list[Wallet]:
+        """Fetch all asset wallets."""
         params: dict[str, Any] = {}
-        if status:
-            params["status"] = status
-        return await self._paginate_all(
-            "/v1/fiatwallets/transactions", params=params, page_size=page_size, limit=limit
+        if asset_id:
+            params["asset_id"] = asset_id
+        raw_items = await self._paginate_all(
+            "/v1/wallets/",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+            limit=limit,
         )
+        return [Wallet.model_validate(item) for item in raw_items]
 
-    # --- Crypto Wallet Transactions ---
-
-    async def list_crypto_transactions(
+    async def iter_wallet_pages(
         self,
         *,
+        asset_id: str | None = None,
+        page_size: int = 25,
+    ) -> AsyncIterator[list[Wallet]]:
+        """Yield wallet pages without pre-collecting the full result set."""
+        params: dict[str, Any] = {}
+        if asset_id:
+            params["asset_id"] = asset_id
+
+        async for page in self._paginate_pages(
+            "/v1/wallets/",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+        ):
+            yield [Wallet.model_validate(item) for item in page.data]
+
+    # --- Transactions ---
+
+    async def list_transactions(
+        self,
+        *,
+        wallet_id: str | None = None,
+        flow: str | None = None,
+        asset_id: str | None = None,
+        from_including: str | None = None,
+        to_excluding: str | None = None,
         page_size: int = 25,
         limit: int = 0,
-    ) -> list[dict[str, Any]]:
-        """Fetch crypto wallet transactions (deposits, withdrawals, etc.)."""
-        return await self._paginate_all("/v1/wallets/transactions", page_size=page_size, limit=limit)
+    ) -> list[Transaction]:
+        """Fetch asset transactions."""
+        params: dict[str, Any] = {}
+        if wallet_id:
+            params["wallet_id"] = wallet_id
+        if flow:
+            params["flow"] = flow
+        if asset_id:
+            params["asset_id"] = asset_id
+        if from_including:
+            params["from_including"] = from_including
+        if to_excluding:
+            params["to_excluding"] = to_excluding
+        raw_items = await self._paginate_all(
+            "/v1/transactions",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+            limit=limit,
+        )
+        return [Transaction.model_validate(item) for item in raw_items]
 
     # --- Trades ---
 
@@ -68,33 +97,71 @@ class BitpandaClient(BaseClient):
         self,
         *,
         trade_type: str | None = None,
+        asset_type: str | None = None,
+        from_including: str | None = None,
+        to_excluding: str | None = None,
         page_size: int = 25,
         limit: int = 0,
     ) -> list[Trade]:
-        """Fetch paginated list of trades."""
+        """Fetch buy and sell trades."""
         params: dict[str, Any] = {}
-        if trade_type:
-            params["type"] = trade_type
-        raw_items = await self._paginate_all("/v1/trades", params=params, page_size=page_size, limit=limit)
-        return [Trade.model_validate(item) for item in raw_items]
+        if from_including:
+            params["from_including"] = from_including
+        if to_excluding:
+            params["to_excluding"] = to_excluding
+
+        ticker: Ticker | None = None
+        trades: list[Trade] = []
+        async for page in self._paginate_pages(
+            "/v1/transactions",
+            params=params,
+            cursor_param="after",
+            page_size=page_size,
+        ):
+            for raw_tx in page.data:
+                tx = Transaction.model_validate(raw_tx)
+                if not tx.is_trade or (trade_type and tx.operation_type != trade_type):
+                    continue
+                if ticker is None:
+                    ticker = await self.fetch_ticker()
+                ticker_entry = ticker.get_by_asset_id(tx.asset_id)
+                if asset_type and (not ticker_entry or ticker_entry.type != asset_type):
+                    continue
+                trades.append(
+                    Trade(
+                        transaction_id=tx.transaction_id,
+                        trade_id=tx.trade_id,
+                        type=tx.operation_type,
+                        asset_id=tx.asset_id,
+                        asset_symbol=ticker_entry.symbol if ticker_entry else "",
+                        asset_name=ticker_entry.name if ticker_entry else "",
+                        asset_type=ticker_entry.type if ticker_entry else "",
+                        asset_amount=tx.asset_amount,
+                        fee_amount=tx.fee_amount,
+                        credited_at=tx.credited_at,
+                        price_eur=ticker_entry.price_eur if ticker_entry else None,
+                    )
+                )
+
+                if limit and len(trades) >= limit:
+                    return trades
+
+        return trades
 
     # --- Ticker / Market Data ---
 
     async def fetch_ticker(self) -> Ticker:
-        """Fetch the public ticker.
-
-        Response is a flat dict: ``{symbol: {currency: price, ...}, ...}``.
-        Only symbols that quote EUR are kept.
-        """
-        raw = await self._get("/v1/ticker")
-        if not isinstance(raw, dict):
-            return Ticker([])
+        """Fetch the public ticker."""
+        raw_items = await self._paginate_all("/v1/ticker", cursor_param="cursor", page_size=500)
         entries: list[TickerEntry] = []
-        for symbol, prices in raw.items():
-            if not isinstance(prices, dict):
-                continue
-            eur = prices.get("EUR")
-            if eur is None:
-                continue
-            entries.append(TickerEntry(symbol=symbol, price_eur=str(eur)))
+        for item in raw_items:
+            entry = TickerEntry.model_validate(item)
+            entries.append(entry)
         return Ticker(entries)
+
+    # --- Assets ---
+
+    async def get_asset(self, asset_id: str) -> Asset:
+        """Fetch one asset by ID."""
+        raw = await self._get(f"/v1/assets/{asset_id}")
+        return AssetEnvelope.model_validate(raw).data

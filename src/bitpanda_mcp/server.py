@@ -17,6 +17,7 @@ from bitpanda_mcp.clients.bitpanda import BitpandaClient
 from bitpanda_mcp.config import Settings
 from bitpanda_mcp.logging import configure_logging
 from bitpanda_mcp.prompts import portfolio as portfolio_prompts
+from bitpanda_mcp.tools import assets as asset_tools
 from bitpanda_mcp.tools import market as market_tools
 from bitpanda_mcp.tools import portfolio as portfolio_tools
 from bitpanda_mcp.tools import trading as trading_tools
@@ -28,10 +29,10 @@ READONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 _TOOLS: list[tuple[Callable[..., Any], set[str]]] = [
     (portfolio_tools.get_portfolio, {"portfolio"}),
     (market_tools.get_price, {"market-data"}),
+    (market_tools.list_prices, {"market-data"}),
+    (asset_tools.get_asset, {"market-data"}),
     (wallet_tools.list_wallets, {"wallets"}),
-    (wallet_tools.list_fiat_wallets, {"wallets"}),
-    (transaction_tools.list_fiat_transactions, {"transactions"}),
-    (transaction_tools.list_crypto_transactions, {"transactions"}),
+    (transaction_tools.list_transactions, {"transactions"}),
     (trading_tools.list_trades, {"trades"}),
 ]
 
@@ -56,7 +57,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, Any]]:
     - **stdio mode**: yields a pre-built ``BitpandaClient`` under ``"bp"`` when
       ``BITPANDA_API_KEY`` is set in the environment.
     - **HTTP mode**: yields only the shared ``httpx.AsyncClient`` under ``"http"``;
-      per-request clients are built from the caller's Bearer token in
+      per-request clients are built from the caller's ``X-Api-Key`` header in
       ``get_bp_client()``. ``BITPANDA_API_KEY`` is ignored in HTTP mode so a
       multi-tenant deployment cannot accidentally route every request through a
       single operator key.
@@ -86,9 +87,12 @@ mcp = FastMCP(
     instructions=(
         "MCP server for Bitpanda. Use get_portfolio for a full overview of holdings with EUR values. "
         "Use get_price to check a specific asset price by symbol (e.g. BTC, ETH). "
-        "Use list_trades to see recent buy/sell activity. "
-        "Use list_wallets and list_fiat_wallets to see crypto and fiat balances separately. "
-        "Use list_fiat_transactions or list_crypto_transactions for detailed history. "
+        "Use list_prices for held-asset ticker prices or a capped market-wide ticker list. "
+        "Use list_trades for normalized buy/sell activity. "
+        "Use list_wallets to see asset balances. "
+        "Use list_transactions for raw transaction history, including deposits, withdrawals, "
+        "transfers, and trades. "
+        "Use get_asset for asset metadata. "
         "All data comes from the Bitpanda API and requires a valid API key."
     ),
     lifespan=lifespan,
@@ -107,9 +111,7 @@ async def health(_request: Request) -> JSONResponse:
 
 def build_http_app(settings: Settings) -> ASGIApp:
     app: ASGIApp = mcp.http_app()
-    if settings.mcp_auth_header:
-        app = ApiKeyHeaderMiddleware(app, header_name=settings.mcp_auth_header)
-    return app
+    return ApiKeyHeaderMiddleware(app, header_name=settings.mcp_auth_header)
 
 
 def main() -> None:

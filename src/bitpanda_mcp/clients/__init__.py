@@ -11,13 +11,15 @@ def get_bp_client(ctx: Context) -> BitpandaClient:
     """Return a BitpandaClient for the current request.
 
     - **stdio mode**: uses the pre-built client from lifespan (``ctx.lifespan_context["bp"]``).
-    - **HTTP mode**: creates a per-request client from the caller's Bearer token.
+    - **HTTP mode**: creates a per-request client from the caller's ``X-Api-Key`` header.
     """
     if "bp" in ctx.lifespan_context:
         return ctx.lifespan_context["bp"]
 
     token = get_access_token()
     if token is None:
-        raise ToolError("Authentication required — send your Bitpanda API key as a Bearer token")
+        raise ToolError(
+            "Authentication required - send your Bitpanda API key in the configured API key header"
+        )
 
     return BitpandaClient(ctx.lifespan_context["http"], token.token)
