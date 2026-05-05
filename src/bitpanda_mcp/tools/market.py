@@ -49,7 +49,11 @@ async def list_prices(
         skipped_asset_ids: list[str] = []
         if not (all_assets or all):
             wallets = await client.list_wallets(page_size=100)
-            held_asset_ids = {wallet.asset_id for wallet in wallets if wallet.balance_float > 0}
+            held_asset_ids = {
+                wallet.asset_id.strip()
+                for wallet in wallets
+                if wallet.balance_float > 0 and wallet.asset_id and wallet.asset_id.strip()
+            }
             entries = [entry for entry in entries if entry.id in held_asset_ids]
             skipped_asset_ids = sorted(held_asset_ids - {entry.id for entry in entries})
 

@@ -175,6 +175,25 @@ async def test_list_prices_limit_zero_returns_all_rows(mcp_client, mock_router: 
     assert result.data["total_available"] == 3
 
 
+async def test_list_prices_excludes_blank_asset_ids(mcp_client, mock_router: respx.MockRouter) -> None:
+    mock_router.get("/v1/ticker").respond(json=TICKER_RESPONSE)
+    mock_router.get("/v1/wallets/").respond(
+        json={
+            "data": [
+                {"wallet_id": "w1", "asset_id": "asset-btc", "balance": "1.0"},
+                {"wallet_id": "w2", "asset_id": "", "balance": "5.0"},
+                {"wallet_id": "w3", "asset_id": "   ", "balance": "3.0"},
+            ],
+            "has_next_page": False,
+        }
+    )
+
+    result = await mcp_client.call_tool("list_prices", {})
+    assert result.data["count"] == 1
+    assert result.data["prices"][0]["symbol"] == "BTC"
+    assert "skipped_asset_ids" not in result.data
+
+
 async def test_list_prices_api_error(mcp_client, mock_router: respx.MockRouter) -> None:
     mock_router.get("/v1/ticker").respond(status_code=500, json={"message": "Server error"})
 
