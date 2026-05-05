@@ -18,6 +18,8 @@ def get_bp_client(ctx: Context) -> BitpandaClient:
 
     token = get_access_token()
     if token is None:
-        raise ToolError("Authentication required - send your Bitpanda API key as X-Api-Key")
+        raise ToolError(
+            "Authentication required - send your Bitpanda API key in the configured API key header"
+        )
 
     return BitpandaClient(ctx.lifespan_context["http"], token.token)
